@@ -172,47 +172,61 @@ class PosController extends Controller
 
     public function getReports(Request $request, $slug)
     {
-        $store = \App\Models\Store::where('slug', $slug)->firstOrFail();
+        // Gunakan try-catch agar jika ada error database, pesan errornya jelas
+        try {
+            $store = Store::where('slug', $slug)->firstOrFail();
 
-        // 1. Ambil Penjualan 7 Hari Terakhir untuk Grafik
-        $salesData = \App\Models\Order::where('store_id', $store->id)
-            ->where('status', 'paid') // Hanya yang sudah dibayar
-            ->where('created_at', '>=', Carbon::now()->subDays(6))
-            ->select(
-                DB::raw('DATE(created_at) as date'),
-                DB::raw('SUM(total_price) as total')
-            )
-            ->groupBy('date')
-            ->orderBy('date', 'ASC')
-            ->get();
+            // 1. Ambil Penjualan 7 Hari Terakhir (Hanya status 'paid' atau 'ready')
+            // Sesuaikan 'status' dengan apa yang kamu gunakan (misal: 'ready' jika sudah bayar)
+            $salesData = Order::where('store_id', $store->id)
+                ->whereIn('status', ['paid', 'ready'])
+                ->where('created_at', '>=', Carbon::now()->subDays(6))
+                ->select(
+                    DB::raw('DATE(created_at) as date'),
+                    DB::raw('SUM(total_price) as total')
+                )
+                ->groupBy('date')
+                ->orderBy('date', 'ASC')
+                ->get();
 
-        // 2. Ambil Menu Terlaris (Top 3)
-        $topProducts = \App\Models\OrderItem::whereHas('order', function ($q) use ($store) {
-            $q->where('store_id', $store->id)->where('status', 'paid');
-        })
-            ->select('product_name', DB::raw('SUM(quantity) as total_qty'))
-            ->groupBy('product_name')
-            ->orderBy('total_qty', 'DESC')
-            ->take(3)
-            ->get();
+            // 2. Ambil Menu Terlaris (Top 3)
+            // KUNCI PERBAIKAN: Join ke tabel products karena product_name tidak ada di order_items
+            $topProducts = OrderItem::whereHas('order', function ($q) use ($store) {
+                $q->where('store_id', $store->id);
+            })
+                ->join('products', 'order_items.product_id', '=', 'products.id') // Join ke produk
+                ->select('products.name as product_name', DB::raw('SUM(order_items.quantity) as total_qty'))
+                ->groupBy('products.name')
+                ->orderBy('total_qty', 'DESC')
+                ->take(3)
+                ->get();
 
-        // 3. Ringkasan Statistik
-        $totalRevenue = \App\Models\Order::where('store_id', $store->id)
-            ->where('status', 'paid')
-            ->where('created_at', '>=', Carbon::now()->startOfWeek())
-            ->sum('total_price');
+            // 3. Ringkasan Statistik
+            $totalRevenue = Order::where('store_id', $store->id)
+                ->whereIn('status', ['paid', 'ready'])
+                ->where('created_at', '>=', Carbon::now()->startOfWeek())
+                ->sum('total_price');
 
-        return response()->json([
-            'status' => 'success',
-            'chart_data' => [
-                'labels' => $salesData->pluck('date')->map(function ($date) {
-                    return Carbon::parse($date)->format('D'); // Format nama hari (Sen, Sel, dsb)
-                }),
-                'values' => $salesData->pluck('total')
-            ],
-            'top_products' => $topProducts,
-            'weekly_revenue' => $totalRevenue,
-            'total_orders' => \App\Models\Order::where('store_id', $store->id)->count()
-        ]);
+            // Pastikan format return match dengan yang diminta frontend (data.chart_labels, dll)
+            return response()->json([
+                'status' => 'success',
+                'data' => [
+                    'chart_labels' => $salesData->pluck('date')->map(function ($date) {
+                        return Carbon::parse($date)->format('D');
+                    }),
+                    'chart_values' => $salesData->pluck('total')->map(fn($v) => (int)$v),
+                    'top_products' => $topProducts,
+                    'weekly_revenue' => (int)$totalRevenue,
+                    'total_orders' => Order::where('store_id', $store->id)->count(),
+                    'new_customers' => 0 // Opsional jika belum ada sistem user
+                ]
+            ]);
+        } catch (\Exception $e) {
+            // Jika error, kirim pesan error aslinya agar gampang debug
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 }
