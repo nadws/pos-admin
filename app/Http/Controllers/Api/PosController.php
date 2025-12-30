@@ -207,6 +207,11 @@ class PosController extends Controller
                 ->where('created_at', '>=', Carbon::now()->startOfWeek())
                 ->sum('total_price');
 
+            $latestOrders = Order::where('store_id', $store->id)
+                ->latest()
+                ->take(10)
+                ->get();
+
             // Pastikan format return match dengan yang diminta frontend (data.chart_labels, dll)
             return response()->json([
                 'status' => 'success',
@@ -218,7 +223,8 @@ class PosController extends Controller
                     'top_products' => $topProducts,
                     'weekly_revenue' => (int)$totalRevenue,
                     'total_orders' => Order::where('store_id', $store->id)->count(),
-                    'new_customers' => 0 // Opsional jika belum ada sistem user
+                    'new_customers' => 0, // Opsional jika belum ada sistem user
+                    'latest_orders' => $latestOrders
                 ]
             ]);
         } catch (\Exception $e) {
