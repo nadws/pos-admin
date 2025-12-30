@@ -22,6 +22,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Ganti route markReady yg lama, atau tambah baru khusus item
     Route::post('/order-items/{id}/ready', [PosController::class, 'markItemReady']);
     Route::get('/pos/{slug}/reports', [PosController::class, 'getReports']);
+    Route::post('/pos/{slug}/orders/{id}/cancel', [PosController::class, 'cancelOrder']);
 });
 
 // Route Logout (Harus punya Token)

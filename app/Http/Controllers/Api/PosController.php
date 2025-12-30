@@ -236,4 +236,28 @@ class PosController extends Controller
             ], 500);
         }
     }
+
+    public function cancelOrder(Request $request, $slug, $id)
+    {
+        try {
+            $store = Store::where('slug', $slug)->firstOrFail();
+            $order = Order::where('store_id', $store->id)->where('id', $id)->firstOrFail();
+
+            // Pastikan pesanan belum dibatalkan sebelumnya
+            if ($order->status === 'cancelled') {
+                return response()->json(['status' => 'error', 'message' => 'Pesanan sudah dibatalkan'], 400);
+            }
+
+            // Update status jadi cancelled
+            $order->update(['status' => 'cancelled']);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Pesanan berhasil dibatalkan',
+                'data' => $order
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+        }
+    }
 }
