@@ -293,7 +293,7 @@ class PosController extends Controller
                 'cash_total' => (int)$cashTotal,
                 'qris_total' => (int)$qrisTotal,
                 'grand_total' => (int)($cashTotal + $qrisTotal),
-                'total_orders' => Order::where('store_id', $store->id)->where('status', 'paid')->whereDate('created_at', $today)->count(),
+                'total_orders' => Order::where('store_id', $store->id)->where('status', 'ready')->whereDate('created_at', $today)->count(),
                 'cancelled_orders' => $cancelledCount
             ]
         ]);
