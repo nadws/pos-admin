@@ -207,9 +207,10 @@ class PosController extends Controller
                 ->where('created_at', '>=', Carbon::now()->startOfWeek())
                 ->sum('total_price');
 
-            $latestOrders = Order::where('store_id', $store->id)
-                ->whereDate('created_at', Carbon::today()) // Hanya ambil tanggal hari ini
-                ->latest() // Urutkan dari yang paling baru
+            $latestOrders = Order::with(['items.product']) // TAMBAHKAN WITH INI
+                ->where('store_id', $store->id)
+                ->whereDate('created_at', Carbon::today())
+                ->latest()
                 ->get();
 
             // Pastikan format return match dengan yang diminta frontend (data.chart_labels, dll)
