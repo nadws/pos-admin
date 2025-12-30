@@ -208,8 +208,8 @@ class PosController extends Controller
                 ->sum('total_price');
 
             $latestOrders = Order::where('store_id', $store->id)
-                ->latest()
-                ->take(10)
+                ->whereDate('created_at', Carbon::today()) // Hanya ambil tanggal hari ini
+                ->latest() // Urutkan dari yang paling baru
                 ->get();
 
             // Pastikan format return match dengan yang diminta frontend (data.chart_labels, dll)
