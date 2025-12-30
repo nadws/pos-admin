@@ -22,8 +22,18 @@ return new class extends Migration
 
         // Hapus kolom store_id di users karena sudah tidak dipakai
         Schema::table('users', function (Blueprint $table) {
-            $table->dropForeign(['store_id']);
-            $table->dropColumn('store_id');
+            if (Schema::hasColumn('users', 'store_id')) {
+
+                // Cek apakah driver database support foreign key dropping (MySQL support)
+                // Kita bungkus pakai try-catch biar kalau key gak ada, migrasi ttp jalan
+                try {
+                    $table->dropForeign(['store_id']);
+                } catch (\Exception $e) {
+                    // Biarkan kosong, artinya kalau gagal drop key, lanjut aja
+                }
+
+                $table->dropColumn('store_id');
+            }
         });
     }
 
