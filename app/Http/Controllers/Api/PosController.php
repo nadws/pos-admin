@@ -268,14 +268,14 @@ class PosController extends Controller
 
         // Hitung total Cash
         $cashTotal = Order::where('store_id', $store->id)
-            ->where('status', 'paid')
+            ->where('status', 'ready')
             ->where('payment_method', 'cash')
             ->whereDate('created_at', $today)
             ->sum('total_price');
 
         // Hitung total QRIS
         $qrisTotal = Order::where('store_id', $store->id)
-            ->where('status', 'paid')
+            ->where('status', 'ready')
             ->where('payment_method', 'qris')
             ->whereDate('created_at', $today)
             ->sum('total_price');
