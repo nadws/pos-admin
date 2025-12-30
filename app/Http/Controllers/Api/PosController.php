@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\Order;
 use App\Models\OrderItem;
+use Carbon\Carbon;
 
 class PosController extends Controller
 {
@@ -166,6 +167,52 @@ class PosController extends Controller
             'status' => 'success',
             'message' => 'Item ditandai selesai.',
             'order_completed' => false
+        ]);
+    }
+
+    public function getReports(Request $request, $slug)
+    {
+        $store = \App\Models\Store::where('slug', $slug)->firstOrFail();
+
+        // 1. Ambil Penjualan 7 Hari Terakhir untuk Grafik
+        $salesData = \App\Models\Order::where('store_id', $store->id)
+            ->where('status', 'paid') // Hanya yang sudah dibayar
+            ->where('created_at', '>=', Carbon::now()->subDays(6))
+            ->select(
+                DB::raw('DATE(created_at) as date'),
+                DB::raw('SUM(total_price) as total')
+            )
+            ->groupBy('date')
+            ->orderBy('date', 'ASC')
+            ->get();
+
+        // 2. Ambil Menu Terlaris (Top 3)
+        $topProducts = \App\Models\OrderItem::whereHas('order', function ($q) use ($store) {
+            $q->where('store_id', $store->id)->where('status', 'paid');
+        })
+            ->select('product_name', DB::raw('SUM(quantity) as total_qty'))
+            ->groupBy('product_name')
+            ->orderBy('total_qty', 'DESC')
+            ->take(3)
+            ->get();
+
+        // 3. Ringkasan Statistik
+        $totalRevenue = \App\Models\Order::where('store_id', $store->id)
+            ->where('status', 'paid')
+            ->where('created_at', '>=', Carbon::now()->startOfWeek())
+            ->sum('total_price');
+
+        return response()->json([
+            'status' => 'success',
+            'chart_data' => [
+                'labels' => $salesData->pluck('date')->map(function ($date) {
+                    return Carbon::parse($date)->format('D'); // Format nama hari (Sen, Sel, dsb)
+                }),
+                'values' => $salesData->pluck('total')
+            ],
+            'top_products' => $topProducts,
+            'weekly_revenue' => $totalRevenue,
+            'total_orders' => \App\Models\Order::where('store_id', $store->id)->count()
         ]);
     }
 }
