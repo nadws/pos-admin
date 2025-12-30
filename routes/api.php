@@ -23,6 +23,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/order-items/{id}/ready', [PosController::class, 'markItemReady']);
     Route::get('/pos/{slug}/reports', [PosController::class, 'getReports']);
     Route::post('/pos/{slug}/orders/{id}/cancel', [PosController::class, 'cancelOrder']);
+    Route::post('/pos/{slug}/orders/{id}/closing', [PosController::class, 'getClosingReport']);
 });
 
 // Route Logout (Harus punya Token)

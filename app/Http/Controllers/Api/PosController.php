@@ -260,4 +260,42 @@ class PosController extends Controller
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
         }
     }
+
+    public function getClosingReport(Request $request, $slug)
+    {
+        $store = Store::where('slug', $slug)->firstOrFail();
+        $today = \Carbon\Carbon::today();
+
+        // Hitung total Cash
+        $cashTotal = Order::where('store_id', $store->id)
+            ->where('status', 'paid')
+            ->where('payment_method', 'cash')
+            ->whereDate('created_at', $today)
+            ->sum('total_price');
+
+        // Hitung total QRIS
+        $qrisTotal = Order::where('store_id', $store->id)
+            ->where('status', 'paid')
+            ->where('payment_method', 'qris')
+            ->whereDate('created_at', $today)
+            ->sum('total_price');
+
+        // Hitung pesanan yang dibatalkan (untuk audit)
+        $cancelledCount = Order::where('store_id', $store->id)
+            ->where('status', 'cancelled')
+            ->whereDate('created_at', $today)
+            ->count();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'date' => $today->format('d M Y'),
+                'cash_total' => (int)$cashTotal,
+                'qris_total' => (int)$qrisTotal,
+                'grand_total' => (int)($cashTotal + $qrisTotal),
+                'total_orders' => Order::where('store_id', $store->id)->where('status', 'paid')->whereDate('created_at', $today)->count(),
+                'cancelled_orders' => $cancelledCount
+            ]
+        ]);
+    }
 }
