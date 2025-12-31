@@ -5,11 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\DailyRegister;
 use App\Models\Store;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class PosController extends Controller
@@ -17,19 +17,15 @@ class PosController extends Controller
     // 1. Ambil Detail Toko & Menunya
     public function getMenu($slug)
     {
-        // Cari toko berdasarkan slug
         $store = Store::where('slug', $slug)->first();
 
-        // Kalau toko gak ketemu, return error 404
         if (!$store) {
             return response()->json(['message' => 'Toko tidak ditemukan'], 404);
         }
 
-        // Ambil semua produk yang "Available" saja
-        // Kita load juga relasi 'category' biar tahu ini makanan/minuman
         $products = $store->products()
             ->where('is_available', true)
-            ->with('category') // Eager load kategori
+            ->with('category')
             ->latest()
             ->get();
 
@@ -44,134 +40,66 @@ class PosController extends Controller
         ]);
     }
 
+    // 2. Simpan Order (Checkout)
     public function storeOrder(Request $request, $slug)
     {
-        // Cari Toko
         $store = Store::where('slug', $slug)->firstOrFail();
 
-        // Validasi data yang dikirim Next.js
         $validated = $request->validate([
             'customer_name' => 'nullable|string',
             'payment_method' => 'required|in:cash,qris',
-            'items' => 'required|array|min:1', // Harus ada barang
+            'items' => 'required|array|min:1',
             'items.*.id' => 'required|exists:products,id',
             'items.*.qty' => 'required|integer|min:1',
-            'items.*.price' => 'required|integer', // Harga dikirim dari front biar aman (atau ambil DB)
+            'items.*.price' => 'required|integer',
+            'money_received' => 'nullable|numeric', // Tambahan untuk catat uang diterima
+            'change' => 'nullable|numeric'          // Tambahan untuk catat kembalian
         ]);
 
-        // Gunakan Transaction biar kalau error, data gak masuk setengah-setengah
         try {
             $order = DB::transaction(function () use ($store, $validated) {
-
-                // Hitung Total Harga Server Side (Lebih aman)
                 $totalPrice = 0;
                 foreach ($validated['items'] as $item) {
                     $totalPrice += $item['price'] * $item['qty'];
                 }
 
-                // 1. Buat Data Order Utama
                 $order = Order::create([
                     'store_id' => $store->id,
-                    'invoice_number' => 'INV-' . time(), // Contoh INV-17098822
+                    'invoice_number' => 'INV-' . time() . rand(100, 999),
                     'customer_name' => $validated['customer_name'] ?? 'Pelanggan Umum',
                     'payment_method' => $validated['payment_method'],
                     'total_price' => $totalPrice,
-                    'status' => 'pending', // Status awal: Menunggu dimasak
+                    'status' => 'completed', // Langsung completed karena POS (bayar di muka)
+                    'kitchen_status' => 'pending', // Masuk antrian dapur
+                    // Simpan info pembayaran jika perlu (opsional, buat kolom baru di migration orders jika mau)
+                    // 'money_received' => $validated['money_received'] ?? 0,
+                    // 'change' => $validated['change'] ?? 0,
                 ]);
 
-                // 2. Simpan Detail Barang (Looping)
                 foreach ($validated['items'] as $item) {
                     OrderItem::create([
                         'order_id' => $order->id,
                         'product_id' => $item['id'],
                         'quantity' => $item['qty'],
                         'price' => $item['price'],
+                        'subtotal' => $item['price'] * $item['qty']
                     ]);
-
-                    // Opsional: Kurangi Stok Produk di sini jika mau
                 }
 
                 return $order;
             });
 
-            // TODO: Di sini nanti kita pasang kode REVERB (Realtime)
-
             return response()->json([
                 'status' => 'success',
                 'message' => 'Pesanan berhasil dibuat!',
-                'order_id' => $order->invoice_number
+                'order' => $order
             ], 201);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Gagal menyimpan pesanan: ' . $e->getMessage()], 500);
         }
     }
 
-    public function markAsReady($id)
-    {
-        // Cari order berdasarkan ID
-        $order = Order::findOrFail($id);
-
-        // Ubah statusnya jadi 'ready'
-        $order->update([
-            'status' => 'ready'
-        ]);
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Pesanan selesai dimasak!'
-        ]);
-    }
-
-    public function getKitchenOrders($slug)
-    {
-        $store = Store::where('slug', $slug)->firstOrFail();
-
-        $orders = Order::where('store_id', $store->id)
-            ->where('status', 'pending') // Cuma ambil yang belum dimasak
-            ->with('items.product')      // Sertakan data barang & nama produk
-            ->orderBy('created_at', 'asc') // Urutkan dari yang pesan duluan
-            ->get();
-
-        return response()->json([
-            'status' => 'success',
-            'orders' => $orders
-        ]);
-    }
-
-    // 5. Update Status PER ITEM
-    public function markItemReady($itemId)
-    {
-        // 1. Cari Itemnya
-        $item = OrderItem::findOrFail($itemId);
-
-        // 2. Ubah status item jadi 'done'
-        $item->update(['status' => 'done']);
-
-        // 3. Cek Induknya (Order Utama)
-        // Apakah masih ada teman-temannya yang statusnya 'pending'?
-        $pendingItems = OrderItem::where('order_id', $item->order_id)
-            ->where('status', 'pending')
-            ->count();
-
-        // 4. Jika pendingItems == 0, berarti SEMUA sudah dimasak
-        if ($pendingItems == 0) {
-            $order = Order::find($item->order_id);
-            $order->update(['status' => 'ready']); // Order dianggap selesai total
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Item selesai. Order juga selesai sepenuhnya!',
-                'order_completed' => true // Flag buat frontend
-            ]);
-        }
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Item ditandai selesai.',
-            'order_completed' => false
-        ]);
-    }
-
+    // 3. Laporan Dashboard (PERBAIKAN UTAMA DISINI)
     public function getReports(Request $request, $slug)
     {
         try {
@@ -256,109 +184,31 @@ class PosController extends Controller
         }
     }
 
-    public function cancelOrder(Request $request, $slug, $id)
-    {
-        try {
-            $store = Store::where('slug', $slug)->firstOrFail();
-            $order = Order::where('store_id', $store->id)->where('id', $id)->firstOrFail();
-
-            // Pastikan pesanan belum dibatalkan sebelumnya
-            if ($order->status === 'cancelled') {
-                return response()->json(['status' => 'error', 'message' => 'Pesanan sudah dibatalkan'], 400);
-            }
-
-            // Update status jadi cancelled
-            $order->update(['status' => 'cancelled']);
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Pesanan berhasil dibatalkan',
-                'data' => $order
-            ]);
-        } catch (\Exception $e) {
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
-        }
-    }
-
-    public function getClosingReport(Request $request, $slug)
-    {
-        $store = Store::where('slug', $slug)->firstOrFail();
-        $today = \Carbon\Carbon::today();
-
-        // Hitung total Cash
-        $cashTotal = Order::where('store_id', $store->id)
-            ->where('status', 'ready')
-            ->where('payment_method', 'cash')
-            ->whereDate('created_at', $today)
-            ->sum('total_price');
-
-        // Hitung total QRIS
-        $qrisTotal = Order::where('store_id', $store->id)
-            ->where('status', 'ready')
-            ->where('payment_method', 'qris')
-            ->whereDate('created_at', $today)
-            ->sum('total_price');
-
-        // Hitung pesanan yang dibatalkan (untuk audit)
-        $cancelledCount = Order::where('store_id', $store->id)
-            ->where('status', 'cancelled')
-            ->whereDate('created_at', $today)
-            ->count();
-
-        return response()->json([
-            'status' => 'success',
-            'data' => [
-                'date' => $today->format('d M Y'),
-                'cash_total' => (int)$cashTotal,
-                'qris_total' => (int)$qrisTotal,
-                'grand_total' => (int)($cashTotal + $qrisTotal),
-                'total_orders' => Order::where('store_id', $store->id)->where('status', 'ready')->whereDate('created_at', $today)->count(),
-                'cancelled_orders' => $cancelledCount
-            ]
-        ]);
-    }
-
+    // 4. Data Karyawan
     public function getEmployees($slug)
     {
-        $store = \App\Models\Store::where('slug', $slug)->first();
+        $store = Store::where('slug', $slug)->first();
+        if (!$store) return response()->json(['message' => 'Toko tidak ditemukan'], 404);
 
-        if (!$store) {
-            return response()->json(['message' => 'Toko tidak ditemukan'], 404);
-        }
-
-        // Ambil user yang merupakan anggota dari toko tersebut
         $employees = $store->members()
             ->select('users.id', 'users.name', 'users.role')
             ->get();
 
-        return response()->json([
-            'success' => true,
-            'data' => $employees
-        ]);
+        return response()->json(['success' => true, 'data' => $employees]);
     }
 
+    // 5. Verifikasi PIN
     public function verifyPin(Request $request)
     {
-        // Gunakan validasi yang lebih fleksibel untuk debugging
         $request->validate([
             'user_id' => 'required',
             'pin' => 'required|string',
         ]);
 
-        // Trim PIN untuk menghindari spasi tak kasat mata
-        $userPin = trim($request->pin);
-
-        $user = User::where('id', $request->user_id)
-            ->where('pin', $userPin)
-            ->first();
+        $user = User::where('id', $request->user_id)->where('pin', trim($request->pin))->first();
 
         if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'PIN salah',
-                // Hapus baris debug ini jika sudah produksi:
-                'debug_received' => $userPin
-            ], 401);
+            return response()->json(['success' => false, 'message' => 'PIN salah'], 401);
         }
 
         $token = $user->createToken('pos_device_token')->plainTextToken;
@@ -369,11 +219,12 @@ class PosController extends Controller
             'user' => ['id' => $user->id, 'name' => $user->name]
         ]);
     }
+
+    // 6. Cek Status Toko (Untuk Modal Awal)
     public function getStoreStatus($slug)
     {
         $store = Store::where('slug', $slug)->firstOrFail();
 
-        // Cari register yang masih OPEN hari ini
         $register = DailyRegister::where('store_id', $store->id)
             ->where('status', 'open')
             ->latest()
@@ -385,19 +236,15 @@ class PosController extends Controller
         ]);
     }
 
-    // 2. Aksi Buka Toko (Simpan Modal Awal)
+    // 7. Buka Toko
     public function openStore(Request $request, $slug)
     {
         $request->validate(['start_cash' => 'required|numeric']);
         $store = Store::where('slug', $slug)->firstOrFail();
 
-        // Cek dulu jangan sampai double open
-        $existing = DailyRegister::where('store_id', $store->id)
-            ->where('status', 'open')->first();
-
-        if ($existing) {
-            return response()->json(['message' => 'Toko sudah buka!'], 400);
-        }
+        // Cek double entry
+        $existing = DailyRegister::where('store_id', $store->id)->where('status', 'open')->first();
+        if ($existing) return response()->json(['message' => 'Toko sudah buka!'], 400);
 
         $register = DailyRegister::create([
             'store_id' => $store->id,
@@ -409,34 +256,90 @@ class PosController extends Controller
         return response()->json(['success' => true, 'data' => $register]);
     }
 
+    // 8. Tutup Toko (Closing)
     public function closeStore(Request $request, $slug)
     {
-        $request->validate([
-            'end_cash' => 'required|numeric' // Uang fisik yang dihitung kasir di laci
-        ]);
-
+        $request->validate(['end_cash' => 'required|numeric']);
         $store = Store::where('slug', $slug)->firstOrFail();
 
-        // Cari register yang sedang OPEN
         $register = DailyRegister::where('store_id', $store->id)
             ->where('status', 'open')
             ->latest()
             ->first();
 
-        if (!$register) {
-            return response()->json(['message' => 'Toko sudah tutup atau belum dibuka.'], 400);
-        }
+        if (!$register) return response()->json(['message' => 'Toko sudah tutup'], 400);
 
-        // Simpan data closing
         $register->update([
             'end_cash' => $request->end_cash,
             'status' => 'closed',
             'updated_at' => now()
         ]);
 
+        return response()->json(['success' => true, 'message' => 'Shift berhasil ditutup.']);
+    }
+
+    // 9. Laporan Closing (Untuk halaman Closing)
+    public function getClosingReport(Request $request, $slug)
+    {
+        $store = Store::where('slug', $slug)->firstOrFail();
+
+        // Cari Shift Aktif
+        $register = DailyRegister::where('store_id', $store->id)->where('status', 'open')->latest()->first();
+
+        // Jika tidak ada shift aktif (toko tutup), ambil dari jam 00:00 hari ini
+        $startTime = $register ? $register->created_at : Carbon::today();
+
+        $cashTotal = Order::where('store_id', $store->id)
+            ->whereIn('status', ['paid', 'ready', 'completed'])
+            ->where('payment_method', 'cash')
+            ->where('created_at', '>=', $startTime)
+            ->sum('total_price');
+
+        $qrisTotal = Order::where('store_id', $store->id)
+            ->whereIn('status', ['paid', 'ready', 'completed'])
+            ->where('payment_method', 'qris')
+            ->where('created_at', '>=', $startTime)
+            ->sum('total_price');
+
+        $cancelledCount = Order::where('store_id', $store->id)
+            ->where('status', 'cancelled')
+            ->where('created_at', '>=', $startTime)
+            ->count();
+
         return response()->json([
-            'success' => true,
-            'message' => 'Shift berhasil ditutup. Sampai jumpa besok!'
+            'status' => 'success',
+            'data' => [
+                'date' => Carbon::now()->format('d M Y'),
+                'cash_total' => (int)$cashTotal,
+                'qris_total' => (int)$qrisTotal,
+                'grand_total' => (int)($cashTotal + $qrisTotal),
+                'total_orders' => Order::where('store_id', $store->id)->where('created_at', '>=', $startTime)->count(),
+                'cancelled_orders' => $cancelledCount
+            ]
         ]);
+    }
+
+    // 10. Fitur Dapur
+    public function getKitchenOrders($slug)
+    {
+        $store = Store::where('slug', $slug)->firstOrFail();
+        $orders = Order::where('store_id', $store->id)
+            ->whereDate('created_at', Carbon::today()) // Ambil hari ini
+            ->where('status', 'completed') // Sudah bayar
+            ->where('kitchen_status', '!=', 'ready') // Belum selesai masak
+            ->with('items.product')
+            ->orderBy('created_at', 'asc')
+            ->get();
+
+        return response()->json(['status' => 'success', 'data' => $orders]);
+    }
+
+    // 11. Update Status Dapur
+    public function updateKitchenStatus(Request $request, $slug, $id)
+    {
+        $order = Order::findOrFail($id);
+        $order->kitchen_status = $request->status; // 'cooking' atau 'ready'
+        $order->save();
+        return response()->json(['success' => true]);
     }
 }
