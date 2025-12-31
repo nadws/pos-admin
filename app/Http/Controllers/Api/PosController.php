@@ -206,6 +206,10 @@ class PosController extends Controller
                 ->whereIn('status', ['paid', 'ready'])
                 ->where('created_at', '>=', Carbon::now()->startOfWeek())
                 ->sum('total_price');
+            $totalRevenueday = Order::where('store_id', $store->id)
+                ->whereIn('status', ['paid', 'ready'])
+                ->where('created_at', '>=', Carbon::now()->startOfDay())
+                ->sum('total_price');
 
             $latestOrders = Order::with(['items.product']) // TAMBAHKAN WITH INI
                 ->where('store_id', $store->id)
@@ -223,6 +227,8 @@ class PosController extends Controller
                     'chart_values' => $salesData->pluck('total')->map(fn($v) => (int)$v),
                     'top_products' => $topProducts,
                     'weekly_revenue' => (int)$totalRevenue,
+
+                    'daily_revenue' => (int)$totalRevenueday,
                     'total_orders' => Order::where('store_id', $store->id)->count(),
                     'new_customers' => 0, // Opsional jika belum ada sistem user
                     'latest_orders' => $latestOrders
