@@ -308,14 +308,16 @@ class PosController extends Controller
 
     public function getEmployees($slug)
     {
-        $store = Store::where('slug', $slug)->first();
+        $store = \App\Models\Store::where('slug', $slug)->first();
 
         if (!$store) {
             return response()->json(['message' => 'Toko tidak ditemukan'], 404);
         }
 
-        // Ambil user yang terhubung dengan toko ini melalui tabel pivot 'members'
-        $employees = $store->members()->select('users.id', 'users.name')->get();
+        // Ambil user yang merupakan anggota dari toko tersebut
+        $employees = $store->members()
+            ->select('users.id', 'users.name')
+            ->get();
 
         return response()->json([
             'success' => true,
