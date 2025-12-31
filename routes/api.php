@@ -24,8 +24,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/pos/{slug}/reports', [PosController::class, 'getReports']);
     Route::post('/pos/{slug}/orders/{id}/cancel', [PosController::class, 'cancelOrder']);
     Route::get('/pos/{slug}/closing', [PosController::class, 'getClosingReport']);
-    Route::get('/pos/{slug}/employees', [PosController::class, 'getEmployees']);
 });
+// Pastikan TIDAK di dalam Route::middleware('auth:sanctum')
+Route::get('/pos/{slug}/employees', [App\Http\Controllers\Api\PosController::class, 'getEmployees']);
 
 // Route Logout (Harus punya Token)
 Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
