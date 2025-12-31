@@ -3,26 +3,30 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\StoreResource\Pages;
-use App\Filament\Resources\StoreResource\RelationManagers;
 use App\Models\Store;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Set;
 use Illuminate\Support\Str;
+use Filament\Infolists\Infolist;
+use Filament\Infolists\Components\Section;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\ViewEntry;
 
 class StoreResource extends Resource
 {
     protected static ?string $model = Store::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-building-storefront';
+
+    // Matikan scope tenant agar daftar store bisa diakses global oleh owner
+    protected static bool $isScopedToTenant = false;
 
     public static function form(Form $form): Form
     {
@@ -30,28 +34,24 @@ class StoreResource extends Resource
             ->schema([
                 TextInput::make('name')
                     ->required()
-                    ->live(onBlur: true) // Saat selesai ketik nama...
+                    ->live(onBlur: true)
                     ->afterStateUpdated(fn(Set $set, ?string $state) =>
-                    $set('slug', Str::slug($state))) // ...Otomatis isi slug
+                    $set('slug', Str::slug($state)))
                     ->label('Nama Cabang'),
 
-                // 2. Slug (URL Toko)
                 TextInput::make('slug')
                     ->required()
-                    ->disabled() // Biar gak diedit manual (atau boleh dihilangkan disabled-nya)
-                    ->dehydrated() // Tetap dikirim ke database meski disabled
+                    ->disabled()
+                    ->dehydrated()
                     ->unique(ignoreRecord: true),
 
-                // 3. Alamat
                 TextInput::make('address')
                     ->label('Alamat Lengkap'),
 
-                // 4. Logo (Opsional)
                 FileUpload::make('logo')
-                    ->directory('stores') // Simpan di folder storage/app/public/stores
+                    ->directory('stores')
                     ->image(),
 
-                // 5. HIDDEN: Otomatis isi user_id dengan User yang sedang login
                 Hidden::make('user_id')
                     ->default(fn() => auth()->id())
                     ->required(),
@@ -67,9 +67,6 @@ class StoreResource extends Resource
                 Tables\Columns\TextColumn::make('slug')->badge(),
                 Tables\Columns\TextColumn::make('address')->limit(30),
             ])
-            ->filters([
-                //
-            ])
             ->actions([
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
@@ -81,11 +78,30 @@ class StoreResource extends Resource
             ]);
     }
 
-    public static function getRelations(): array
+    // Fungsi Infolist untuk menampilkan QR Code
+    public static function infolist(Infolist $infolist): Infolist
     {
-        return [
-            //
-        ];
+        return $infolist
+            ->schema([
+                Section::make('Setup Perangkat Mobile')
+                    ->description('Scan QR Code ini melalui aplikasi mobile untuk menghubungkan perangkat kasir ke cabang ini.')
+                    ->schema([
+                        ViewEntry::make('qr_code')
+                            ->label('QR Code Setup')
+                            ->view('filament.stores.qr-code-setup') // Mengarah ke file blade
+                            ->columnSpan(1),
+
+                        Section::make('Informasi Cabang')
+                            ->schema([
+                                TextEntry::make('name')
+                                    ->label('Nama Cabang'),
+                                TextEntry::make('slug')
+                                    ->label('Store ID / Slug')
+                                    ->badge(),
+                            ])->columnSpan(1),
+                    ])
+                    ->columns(2),
+            ]);
     }
 
     public static function getPages(): array

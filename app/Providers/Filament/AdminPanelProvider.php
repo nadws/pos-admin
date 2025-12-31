@@ -30,6 +30,7 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->tenant(Store::class)
+            ->tenant(Store::class, ownershipRelationship: 'stores') // 'stores' adalah relasi di model User
             ->tenantRegistration(RegisterStore::class)
 
             ->colors([
