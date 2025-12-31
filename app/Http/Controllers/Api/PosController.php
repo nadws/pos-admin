@@ -317,7 +317,7 @@ class PosController extends Controller
 
         // Ambil user yang merupakan anggota dari toko tersebut
         $employees = $store->members()
-            ->select('users.id', 'users.name')
+            ->select('users.id', 'users.name', 'users.role')
             ->get();
 
         return response()->json([
