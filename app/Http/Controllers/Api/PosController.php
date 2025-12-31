@@ -230,6 +230,7 @@ class PosController extends Controller
 
                     'daily_revenue' => (int)$totalRevenueday,
                     'total_orders' => Order::where('store_id', $store->id)->count(),
+                    'total_orders_day' => Order::where('store_id', $store->id)->whereDate('created_at', Carbon::today())->count(),
                     'new_customers' => 0, // Opsional jika belum ada sistem user
                     'latest_orders' => $latestOrders
                 ]
