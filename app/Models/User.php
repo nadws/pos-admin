@@ -27,6 +27,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
         'email',
         'password',
         'role',
+        'pin',
         // 'store_id' <--- 3. SUDAH DIHAPUS (Karena sekarang pakai tabel store_user)
     ];
 

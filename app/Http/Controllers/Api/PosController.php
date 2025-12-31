@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\User;
 use Carbon\Carbon;
 
 class PosController extends Controller
@@ -322,6 +323,46 @@ class PosController extends Controller
         return response()->json([
             'success' => true,
             'data' => $employees
+        ]);
+    }
+
+    public function verifyPin(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'user_id' => 'required',
+            'pin' => 'required|string|size:6',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $user = User::where('id', $request->user_id)
+            ->where('pin', $request->pin)
+            ->first();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'PIN yang Anda masukkan salah.'
+            ], 401);
+        }
+
+        // Hapus token lama jika ingin membatasi 1 sesi per user (opsional)
+        $user->tokens()->delete();
+
+        $token = $user->createToken('pos_device_token')->plainTextToken;
+
+        return response()->json([
+            'success' => true,
+            'token' => $token,
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+            ]
         ]);
     }
 }

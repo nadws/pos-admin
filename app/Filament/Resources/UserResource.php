@@ -79,6 +79,15 @@ class UserResource extends Resource
                     ->gridDirection('row')
                     ->visible(fn(Get $get) => $get('role') === 'staff') // Sembunyi kalau role Owner
                     ->required(fn(Get $get) => $get('role') === 'staff'), // Wajib kalau role Staff
+                TextInput::make('pin')
+                    ->label('PIN Keamanan (6 Digit)')
+                    ->password() // Agar tidak terlihat saat diketik
+                    ->revealable() // User bisa klik mata untuk melihat
+                    ->maxLength(6)
+                    ->minLength(6)
+                    ->numeric()
+                    ->helperText('Gunakan 6 digit angka untuk login kasir di aplikasi mobile.')
+
             ]);
     }
 

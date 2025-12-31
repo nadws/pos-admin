@@ -27,7 +27,7 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 // Pastikan TIDAK di dalam Route::middleware('auth:sanctum')
 Route::get('/pos/{slug}/employees', [App\Http\Controllers\Api\PosController::class, 'getEmployees']);
-
+Route::post('/pos/verify-pin', [PosController::class, 'verifyPin']);
 // Route Logout (Harus punya Token)
 Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
 
