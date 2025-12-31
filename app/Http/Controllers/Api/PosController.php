@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\DailyRegister;
 use App\Models\Store;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -357,5 +358,44 @@ class PosController extends Controller
             'token' => $token,
             'user' => ['id' => $user->id, 'name' => $user->name]
         ]);
+    }
+    public function getStoreStatus($slug)
+    {
+        $store = Store::where('slug', $slug)->firstOrFail();
+
+        // Cari register yang masih OPEN hari ini
+        $register = DailyRegister::where('store_id', $store->id)
+            ->where('status', 'open')
+            ->latest()
+            ->first();
+
+        return response()->json([
+            'is_open' => $register ? true : false,
+            'data' => $register
+        ]);
+    }
+
+    // 2. Aksi Buka Toko (Simpan Modal Awal)
+    public function openStore(Request $request, $slug)
+    {
+        $request->validate(['start_cash' => 'required|numeric']);
+        $store = Store::where('slug', $slug)->firstOrFail();
+
+        // Cek dulu jangan sampai double open
+        $existing = DailyRegister::where('store_id', $store->id)
+            ->where('status', 'open')->first();
+
+        if ($existing) {
+            return response()->json(['message' => 'Toko sudah buka!'], 400);
+        }
+
+        $register = DailyRegister::create([
+            'store_id' => $store->id,
+            'user_id' => $request->user()->id,
+            'start_cash' => $request->start_cash,
+            'status' => 'open'
+        ]);
+
+        return response()->json(['success' => true, 'data' => $register]);
     }
 }
