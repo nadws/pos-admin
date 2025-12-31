@@ -6,5 +6,5 @@ use Illuminate\Database\Eloquent\Model;
 
 class DailyRegister extends Model
 {
-    //
+    protected $guarded = [];
 }

@@ -24,6 +24,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/pos/{slug}/reports', [PosController::class, 'getReports']);
     Route::post('/pos/{slug}/orders/{id}/cancel', [PosController::class, 'cancelOrder']);
     Route::get('/pos/{slug}/closing', [PosController::class, 'getClosingReport']);
+    Route::post('/pos/{slug}/close-store', [PosController::class, 'closeStore']);
     Route::get('/pos/{slug}/status', [PosController::class, 'getStoreStatus']);
     Route::post('/pos/{slug}/open-store', [PosController::class, 'openStore']);
 });

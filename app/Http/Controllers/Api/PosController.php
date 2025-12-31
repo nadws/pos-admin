@@ -398,4 +398,35 @@ class PosController extends Controller
 
         return response()->json(['success' => true, 'data' => $register]);
     }
+
+    public function closeStore(Request $request, $slug)
+    {
+        $request->validate([
+            'end_cash' => 'required|numeric' // Uang fisik yang dihitung kasir di laci
+        ]);
+
+        $store = Store::where('slug', $slug)->firstOrFail();
+
+        // Cari register yang sedang OPEN
+        $register = DailyRegister::where('store_id', $store->id)
+            ->where('status', 'open')
+            ->latest()
+            ->first();
+
+        if (!$register) {
+            return response()->json(['message' => 'Toko sudah tutup atau belum dibuka.'], 400);
+        }
+
+        // Simpan data closing
+        $register->update([
+            'end_cash' => $request->end_cash,
+            'status' => 'closed',
+            'updated_at' => now()
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Shift berhasil ditutup. Sampai jumpa besok!'
+        ]);
+    }
 }
