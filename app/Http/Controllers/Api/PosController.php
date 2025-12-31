@@ -174,14 +174,45 @@ class PosController extends Controller
 
     public function getReports(Request $request, $slug)
     {
-        // Gunakan try-catch agar jika ada error database, pesan errornya jelas
         try {
             $store = Store::where('slug', $slug)->firstOrFail();
 
-            // 1. Ambil Penjualan 7 Hari Terakhir (Hanya status 'paid' atau 'ready')
-            // Sesuaikan 'status' dengan apa yang kamu gunakan (misal: 'ready' jika sudah bayar)
+            // --- LOGIKA SHIFT / BUKA TOKO ---
+            // Cari shift yang sedang OPEN
+            $currentRegister = DailyRegister::where('store_id', $store->id)
+                ->where('status', 'open')
+                ->latest()
+                ->first();
+
+            // Jika toko BUKA, hitung mulai dari jam buka shift. 
+            // Jika TUTUP, set waktu ke 'sekarang' (agar hasil pencarian pesanan jadi 0/kosong)
+            $startTime = $currentRegister ? $currentRegister->created_at : Carbon::now();
+
+            // A. Revenue Shift Ini (Hanya hitung setelah jam buka toko)
+            $currentShiftRevenue = Order::where('store_id', $store->id)
+                ->whereIn('status', ['paid', 'ready', 'completed'])
+                ->where('created_at', '>=', $startTime)
+                ->sum('total_price');
+
+            // B. Total Order Shift Ini
+            $currentShiftOrders = Order::where('store_id', $store->id)
+                ->where('created_at', '>=', $startTime)
+                ->count();
+
+            // C. Order Terbaru (Hanya shift ini)
+            $latestOrders = Order::with(['items.product'])
+                ->where('store_id', $store->id)
+                ->where('created_at', '>=', $startTime)
+                ->latest()
+                ->take(10)
+                ->get();
+
+
+            // --- DATA GLOBAL / HISTORICAL (Tetap Harian/Mingguan) ---
+
+            // D. Grafik 7 Hari Terakhir
             $salesData = Order::where('store_id', $store->id)
-                ->whereIn('status', ['paid', 'ready'])
+                ->whereIn('status', ['paid', 'ready', 'completed'])
                 ->where('created_at', '>=', Carbon::now()->subDays(6))
                 ->select(
                     DB::raw('DATE(created_at) as date'),
@@ -191,58 +222,37 @@ class PosController extends Controller
                 ->orderBy('date', 'ASC')
                 ->get();
 
-            // 2. Ambil Menu Terlaris (Top 3)
-            // KUNCI PERBAIKAN: Join ke tabel products karena product_name tidak ada di order_items
+            // E. Top Products (Tetap ambil Global/Harian agar data tidak kosong saat baru buka)
+            // Atau bisa diubah filter waktunya jika mau Top Product per Shift juga
             $topProducts = OrderItem::whereHas('order', function ($q) use ($store) {
                 $q->where('store_id', $store->id);
             })
-                ->join('products', 'order_items.product_id', '=', 'products.id') // Join ke produk
+                ->join('products', 'order_items.product_id', '=', 'products.id')
                 ->select('products.name as product_name', DB::raw('SUM(order_items.quantity) as total_qty'))
                 ->groupBy('products.name')
                 ->orderBy('total_qty', 'DESC')
                 ->take(3)
                 ->get();
 
-            // 3. Ringkasan Statistik
-            $totalRevenue = Order::where('store_id', $store->id)
-                ->whereIn('status', ['paid', 'ready'])
-                ->where('created_at', '>=', Carbon::now()->startOfWeek())
-                ->sum('total_price');
-            $totalRevenueday = Order::where('store_id', $store->id)
-                ->whereIn('status', ['paid', 'ready'])
-                ->where('created_at', '>=', Carbon::now()->startOfDay())
-                ->sum('total_price');
-
-            $latestOrders = Order::with(['items.product']) // TAMBAHKAN WITH INI
-                ->where('store_id', $store->id)
-                ->whereDate('created_at', Carbon::today())
-                ->latest()
-                ->get();
-
-            // Pastikan format return match dengan yang diminta frontend (data.chart_labels, dll)
             return response()->json([
                 'status' => 'success',
                 'data' => [
-                    'chart_labels' => $salesData->pluck('date')->map(function ($date) {
-                        return Carbon::parse($date)->format('D');
-                    }),
+                    // Data Grafik
+                    'chart_labels' => $salesData->pluck('date')->map(fn($d) => Carbon::parse($d)->format('D')),
                     'chart_values' => $salesData->pluck('total')->map(fn($v) => (int)$v),
-                    'top_products' => $topProducts,
-                    'weekly_revenue' => (int)$totalRevenue,
 
-                    'daily_revenue' => (int)$totalRevenueday,
-                    'total_orders' => Order::where('store_id', $store->id)->count(),
-                    'total_orders_day' => Order::where('store_id', $store->id)->whereDate('created_at', Carbon::today())->count(),
-                    'new_customers' => 0, // Opsional jika belum ada sistem user
-                    'latest_orders' => $latestOrders
+                    // Data Dashboard (Shift Ini)
+                    'daily_revenue' => (int)$currentShiftRevenue, // Reset jadi 0 kalau baru buka
+                    'total_orders_day' => $currentShiftOrders,    // Reset jadi 0 kalau baru buka
+
+                    // Data Lainnya
+                    'top_products' => $topProducts,
+                    'latest_orders' => $latestOrders,
+                    'weekly_revenue' => (int) Order::where('store_id', $store->id)->where('created_at', '>=', Carbon::now()->startOfWeek())->sum('total_price'),
                 ]
             ]);
         } catch (\Exception $e) {
-            // Jika error, kirim pesan error aslinya agar gampang debug
-            return response()->json([
-                'status' => 'error',
-                'message' => $e->getMessage()
-            ], 500);
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
         }
     }
 
