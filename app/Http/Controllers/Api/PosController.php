@@ -328,41 +328,34 @@ class PosController extends Controller
 
     public function verifyPin(Request $request)
     {
-        $validator = Validator::make($request->all(), [
+        // Gunakan validasi yang lebih fleksibel untuk debugging
+        $request->validate([
             'user_id' => 'required',
-            'pin' => 'required|string|size:6',
+            'pin' => 'required|string',
         ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors()
-            ], 422);
-        }
+        // Trim PIN untuk menghindari spasi tak kasat mata
+        $userPin = trim($request->pin);
 
         $user = User::where('id', $request->user_id)
-            ->where('pin', $request->pin)
+            ->where('pin', $userPin)
             ->first();
 
         if (!$user) {
             return response()->json([
                 'success' => false,
-                'message' => 'PIN yang Anda masukkan salah.'
+                'message' => 'PIN salah',
+                // Hapus baris debug ini jika sudah produksi:
+                'debug_received' => $userPin
             ], 401);
         }
-
-        // Hapus token lama jika ingin membatasi 1 sesi per user (opsional)
-        $user->tokens()->delete();
 
         $token = $user->createToken('pos_device_token')->plainTextToken;
 
         return response()->json([
             'success' => true,
             'token' => $token,
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-            ]
+            'user' => ['id' => $user->id, 'name' => $user->name]
         ]);
     }
 }
