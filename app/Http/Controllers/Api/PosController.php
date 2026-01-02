@@ -70,7 +70,7 @@ class PosController extends Controller
                     'payment_method' => $validated['payment_method'],
                     'total_price' => $totalPrice,
                     'status' => 'completed', // Langsung completed karena POS (bayar di muka)
-                    'kitchen_status' => 'pending', // Masuk antrian dapur
+                    // 'kitchen_status' => 'pending', // Masuk antrian dapur
                     // Simpan info pembayaran jika perlu (opsional, buat kolom baru di migration orders jika mau)
                     // 'money_received' => $validated['money_received'] ?? 0,
                     // 'change' => $validated['change'] ?? 0,
@@ -82,7 +82,8 @@ class PosController extends Controller
                         'product_id' => $item['id'],
                         'quantity' => $item['qty'],
                         'price' => $item['price'],
-                        'subtotal' => $item['price'] * $item['qty']
+                        'subtotal' => $item['price'] * $item['qty'],
+                        'status' => 'pending',
                     ]);
                 }
 
@@ -335,11 +336,61 @@ class PosController extends Controller
     }
 
     // 11. Update Status Dapur
+    // 11. Update Status Dapur & Kurangi Stok
+    // 11. Update Status Dapur & Potong Stok Produk Langsung
     public function updateKitchenStatus(Request $request, $slug, $id)
     {
-        $order = Order::findOrFail($id);
-        $order->kitchen_status = $request->status; // 'cooking' atau 'ready'
-        $order->save();
+        $request->validate([
+            'status' => 'required|in:cooking,ready'
+        ]);
+
+        $store = Store::where('slug', $slug)->firstOrFail();
+
+        // Cari Ordernya
+        $order = Order::with('items.product') // Pastikan load items & product
+            ->where('id', $id)
+            ->where('store_id', $store->id)
+            ->firstOrFail();
+
+        // LOGIKA UTAMA:
+        // Jika status diubah jadi 'ready' DAN sebelumnya belum 'ready'
+        if ($request->status === 'ready' && $order->kitchen_status !== 'ready') {
+
+            try {
+                DB::transaction(function () use ($order) {
+
+                    // Loop semua item yang dipesan
+                    foreach ($order->items as $item) {
+                        $product = $item->product;
+
+                        // Cek: Apakah produk ini stoknya harus dihitung?
+                        // (Biasanya jasa/ongkir tidak punya stok, tapi barang punya)
+                        if ($product) {
+                            // RUMUS: Stok Lama - Jumlah Pesanan
+                            // Contoh: Stok Aqua 10 - Pesan 2 = Sisa 8
+                            $product->decrement('stock', $item->quantity);
+                        }
+                    }
+
+                    // Ubah status jadi selesai masak
+                    $order->update(['kitchen_status' => 'ready']);
+                });
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Pesanan selesai! Stok produk telah dikurangi.'
+                ]);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error saat potong stok: ' . $e->getMessage()
+                ], 500);
+            }
+        }
+
+        // Kalau status cuma diubah jadi 'cooking' atau dibatalkan, update status aja tanpa potong stok
+        $order->update(['kitchen_status' => $request->status]);
+
         return response()->json(['success' => true]);
     }
 }
