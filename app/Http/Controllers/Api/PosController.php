@@ -82,7 +82,7 @@ class PosController extends Controller
                         'product_id' => $item['id'],
                         'quantity' => $item['qty'],
                         'price' => $item['price'],
-                        'subtotal' => $item['price'] * $item['qty'],
+
                         'status' => 'pending',
                     ]);
                 }
