@@ -393,4 +393,38 @@ class PosController extends Controller
 
         return response()->json(['success' => true]);
     }
+
+    public function markAsReady(Request $request, $orderId)
+    {
+        // 1. Cari Pesanannya
+        $order = Order::with('items.product.ingredients')->find($orderId);
+
+        if ($order->status == 'ready') {
+            return response()->json(['message' => 'Pesanan sudah selesai sebelumnya'], 400);
+        }
+
+        // 2. MULAI TRANSAKSI DATABASE (Penting! Biar aman)
+        DB::transaction(function () use ($order) {
+
+            // 3. Looping setiap menu yang dipesan (Misal: Nasi Goreng, Es Teh)
+            foreach ($order->items as $item) {
+
+                // 4. Looping bahan baku dari menu tersebut (Resep)
+                // Asumsi kamu punya relasi product -> ingredients
+                foreach ($item->product->ingredients as $ingredient) {
+
+                    // Rumus: Stok Lama - (Jumlah Pemakaian per Porsi * Jumlah Pesanan)
+                    $qtyUsed = $ingredient->pivot->amount * $item->quantity;
+
+                    // Kurangi Stok di Tabel Inventory
+                    $ingredient->inventory->decrement('stock', $qtyUsed);
+                }
+            }
+
+            // 5. Update Status Pesanan jadi 'ready' (Selesai Masak)
+            $order->update(['status' => 'ready']);
+        });
+
+        return response()->json(['message' => 'Status update & Stok berkurang!']);
+    }
 }
