@@ -69,7 +69,7 @@ class PosController extends Controller
                     'customer_name' => $validated['customer_name'] ?? 'Pelanggan Umum',
                     'payment_method' => $validated['payment_method'],
                     'total_price' => $totalPrice,
-                    'status' => 'completed', // Langsung completed karena POS (bayar di muka)
+                    'status' => 'pending', // Langsung completed karena POS (bayar di muka)
                     // 'kitchen_status' => 'pending', // Masuk antrian dapur
                     // Simpan info pembayaran jika perlu (opsional, buat kolom baru di migration orders jika mau)
                     // 'money_received' => $validated['money_received'] ?? 0,
