@@ -326,8 +326,8 @@ class PosController extends Controller
         $store = Store::where('slug', $slug)->firstOrFail();
         $orders = Order::where('store_id', $store->id)
             ->whereDate('created_at', Carbon::today()) // Ambil hari ini
-            ->where('status', 'completed') // Sudah bayar
-            ->where('status', '!=', 'ready') // Belum selesai masak
+            ->where('status', 'pending') // Sudah bayar
+            // Belum selesai masak
             ->with('items.product')
             ->orderBy('created_at', 'asc')
             ->get();
