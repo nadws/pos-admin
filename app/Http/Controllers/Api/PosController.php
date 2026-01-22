@@ -10,6 +10,7 @@ use App\Models\OrderItem;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+
 use Carbon\Carbon;
 
 class PosController extends Controller
