@@ -379,7 +379,7 @@ class PosController extends Controller
                     $pendingItems = $parentOrder->items()->where('status', '!=', 'done')->count();
 
                     if ($pendingItems === 0) {
-                        $parentOrder->update(['kitchen_status' => 'ready']);
+                        $parentOrder->update(['status' => 'ready']);
                     }
                 }
             });
