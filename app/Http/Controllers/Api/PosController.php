@@ -340,7 +340,7 @@ class PosController extends Controller
     // 11. Update Status Dapur
     // 11. Update Status Dapur & Kurangi Stok
     // 11. Update Status Dapur & Potong Stok Produk Langsung
-    public function updateKitchenStatus(Request $request, $slug, $id)
+    public function markItemReady(Request $request, $slug, $id)
     {
         $request->validate([
             'status' => 'required|in:cooking,ready'
