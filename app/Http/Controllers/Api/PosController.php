@@ -340,60 +340,61 @@ class PosController extends Controller
     // 11. Update Status Dapur
     // 11. Update Status Dapur & Kurangi Stok
     // 11. Update Status Dapur & Potong Stok Produk Langsung
-    public function markItemReady(Request $request, $slug, $id)
+    public function markItemReady($id)
     {
-        $request->validate([
-            'status' => 'required|in:cooking,ready'
-        ]);
+        // 1. Cari Item berdasarkan ID (bukan Order)
+        $orderItem = OrderItem::with(['product', 'order'])->find($id);
 
-        $store = Store::where('slug', $slug)->firstOrFail();
-
-        // Cari Ordernya
-        $order = Order::with('items.product') // Pastikan load items & product
-            ->where('id', $id)
-            ->where('store_id', $store->id)
-            ->firstOrFail();
-
-        // LOGIKA UTAMA:
-        // Jika status diubah jadi 'ready' DAN sebelumnya belum 'ready'
-        if ($request->status === 'ready' && $order->kitchen_status !== 'ready') {
-
-            try {
-                DB::transaction(function () use ($order) {
-
-                    // Loop semua item yang dipesan
-                    foreach ($order->items as $item) {
-                        $product = $item->product;
-
-                        // Cek: Apakah produk ini stoknya harus dihitung?
-                        // (Biasanya jasa/ongkir tidak punya stok, tapi barang punya)
-                        if ($product) {
-                            // RUMUS: Stok Lama - Jumlah Pesanan
-                            // Contoh: Stok Aqua 10 - Pesan 2 = Sisa 8
-                            $product->decrement('stock', $item->quantity);
-                        }
-                    }
-
-                    // Ubah status jadi selesai masak
-                    $order->update(['kitchen_status' => 'ready']);
-                });
-
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Pesanan selesai! Stok produk telah dikurangi.'
-                ]);
-            } catch (\Exception $e) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Error saat potong stok: ' . $e->getMessage()
-                ], 500);
-            }
+        if (!$orderItem) {
+            return response()->json(['message' => 'Item tidak ditemukan'], 404);
         }
 
-        // Kalau status cuma diubah jadi 'cooking' atau dibatalkan, update status aja tanpa potong stok
-        $order->update(['kitchen_status' => $request->status]);
+        // 2. Cek apakah item sudah selesai sebelumnya? (Mencegah error/double stok)
+        if ($orderItem->status === 'done') {
+            return response()->json(['message' => 'Item ini sudah selesai sebelumnya'], 200);
+        }
 
-        return response()->json(['success' => true]);
+        try {
+            DB::transaction(function () use ($orderItem) {
+                // A. Potong Stok (Hanya jika ada produk terkait)
+                if ($orderItem->product) {
+                    $product = $orderItem->product;
+                    // Pastikan stok tidak minus (opsional)
+                    if ($product->stock >= $orderItem->quantity) {
+                        $product->decrement('stock', $orderItem->quantity);
+                    } else {
+                        // Jika stok kurang, tetap lanjut atau throw error?
+                        // Di sini kita paksa kurangi saja agar data sinkron
+                        $product->decrement('stock', $orderItem->quantity);
+                    }
+                }
+
+                // B. Update Status Item jadi 'done'
+                $orderItem->update(['status' => 'done']);
+
+                // C. Cek Otomatis: Apakah semua item di meja ini sudah keluar?
+                // Jika ya, ubah status Order induk menjadi 'ready' (siap saji)
+                $parentOrder = $orderItem->order;
+                if ($parentOrder) {
+                    $pendingItems = $parentOrder->items()->where('status', '!=', 'done')->count();
+
+                    if ($pendingItems === 0) {
+                        $parentOrder->update(['kitchen_status' => 'ready']);
+                    }
+                }
+            });
+
+            return response()->json([
+                'success' => true, // Pakai 'success' agar konsisten dengan frontend
+                'message' => 'Item selesai & stok dikurangi',
+                'data' => $orderItem
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Server Error: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     public function markAsReady(Request $request, $orderId)
