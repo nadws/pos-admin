@@ -15,6 +15,7 @@ class OrderStats extends ChartWidget
         $data = Order::selectRaw('DATE(created_at) as tanggal, SUM(total_price) as total')
             ->whereDate('created_at', '>=', now()->subDays(6))
             ->where('store_id', $storeId)
+            ->whereIn('status', ['paid', 'ready', 'completed'])
             ->groupBy('tanggal')
             ->orderBy('tanggal')
             ->get();
