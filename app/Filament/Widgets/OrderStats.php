@@ -7,6 +7,7 @@ use App\Models\Order;
 
 class OrderStats extends ChartWidget
 {
+    protected static ?int $sort = 2;
     protected static ?string $heading = 'Penjualan 7 Hari Terakhir';
 
     protected function getData(): array

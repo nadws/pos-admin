@@ -22,7 +22,7 @@ class OrderResource extends Resource
 {
     protected static ?string $model = Order::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-document-currency-dollar';
+    protected static ?string $navigationIcon = 'heroicon-o-banknotes';
     protected static ?string $navigationGroup = 'Transaksi';
 
     protected static ?string $tenantOwnershipRelationshipName = 'store';

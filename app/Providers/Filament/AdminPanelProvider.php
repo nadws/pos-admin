@@ -20,6 +20,7 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 use App\Models\Store;
 use App\Filament\Pages\Tenancy\RegisterStore;
 
+
 class AdminPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
@@ -32,10 +33,13 @@ class AdminPanelProvider extends PanelProvider
             ->tenant(Store::class)
             ->tenant(Store::class, ownershipRelationship: 'stores') // 'stores' adalah relasi di model User
             ->tenantRegistration(RegisterStore::class)
+            ->brandName('Uwais POS')
 
             ->colors([
                 'primary' => Color::Amber,
             ])
+
+
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
@@ -43,8 +47,8 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
-                Widgets\AccountWidget::class,
-                Widgets\FilamentInfoWidget::class,
+                // Widgets\AccountWidget::class,
+                // Widgets\FilamentInfoWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,
