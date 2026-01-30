@@ -5,6 +5,8 @@ namespace App\Filament\Widgets;
 use App\Models\Category;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\Purchase;
+use App\Models\PurchaseItem;
 use Filament\Support\Enums\IconPosition;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
@@ -26,15 +28,26 @@ class StatsOverview extends BaseWidget
                 ->chart([1, 3, 5, 2, 8, 10, 15]) // Mini chart
                 ->color('primary'),
 
-            Stat::make('Total Penjualan', Number::currency(
+            Stat::make('Pemasukan', 'Rp ' . Number::abbreviate(
                 Order::where('status', 'ready')->where('store_id', $storeId)->sum('total_price'),
-                in: 'IDR',
-                locale: 'id'
+                precision: 1
             ))
-                ->description('Orderan Selesai')
-                ->descriptionIcon('heroicon-m-banknotes', IconPosition::Before)
-                ->chart([1, 3, 5, 2, 8, 10, 15])
+                ->description('Total Penjualan')
+                ->descriptionIcon('heroicon-m-banknotes')
+                ->chart([1, 3, 5, 7, 8, 10, 15])
                 ->color('success'),
+
+            Stat::make('Pengeluaran', 'Rp ' . Number::abbreviate(
+                Purchase::where('store_id', $storeId)
+                    ->withSum('items', 'subtotal')
+                    ->get()
+                    ->sum('items_sum_subtotal'), // Baru di sini kita sum hasil aggregatnya
+                precision: 1
+            ))
+                ->description('Total Pembelian')
+                ->descriptionIcon('heroicon-m-credit-card', IconPosition::Before)
+                ->chart([1, 3, 5, 2, 8, 10, 15])
+                ->color('info'),
 
             Stat::make('Jumlah Produk', Product::where('is_available', '1')->where('store_id', $storeId)->count())
                 ->description('Jumlah Produk')
