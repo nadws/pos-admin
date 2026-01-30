@@ -19,9 +19,6 @@ class OrderStats extends ChartWidget
             ->groupBy('tanggal')
             ->orderBy('tanggal')
             ->get();
-
-
-
         return [
             'datasets' => [
                 [

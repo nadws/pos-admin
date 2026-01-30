@@ -24,7 +24,7 @@ class StoreResource extends Resource
     protected static ?string $model = Store::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-building-storefront';
-
+    protected static ?string $navigationGroup = 'Administrasi';
     // Matikan scope tenant agar daftar store bisa diakses global oleh owner
     protected static bool $isScopedToTenant = false;
 

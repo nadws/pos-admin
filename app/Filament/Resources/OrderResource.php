@@ -22,7 +22,8 @@ class OrderResource extends Resource
 {
     protected static ?string $model = Order::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-document-currency-dollar';
+    protected static ?string $navigationGroup = 'Transaksi';
 
     protected static ?string $tenantOwnershipRelationshipName = 'store';
 
@@ -81,6 +82,7 @@ class OrderResource extends Resource
                             ])
                             ->addable(false) // Gaboleh tambah item manual
                             ->deletable(false) // Gaboleh hapus item
+                            ->columns(3)
                             ->columnSpanFull()
                     ])
             ]);
