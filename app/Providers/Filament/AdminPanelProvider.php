@@ -30,14 +30,20 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
+            ->registration()
             ->tenant(Store::class)
             ->tenant(Store::class, ownershipRelationship: 'stores') // 'stores' adalah relasi di model User
             ->tenantRegistration(RegisterStore::class)
-            ->brandName('Uwais POS')
+            ->brandName(new \Illuminate\Support\HtmlString(
+                '<span style="color: #111827; font-weight: 800;">UWAIS</span><span style="color: #3B82F6; font-weight: 800;">POS</span>'
+            ))
+
 
             ->colors([
-                'primary' => Color::Amber,
+                'primary' => Color::hex('#1E40AF'),
+                'gray' => Color::Slate,
             ])
+            ->font('Inter')
 
 
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
