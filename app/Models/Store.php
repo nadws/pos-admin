@@ -8,7 +8,17 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Store extends Model
 {
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'slug',
+        'is_active',
+        'subscription_until',
+    ];
+
+    protected $casts = [
+        'is_active' => 'boolean',
+        'subscription_until' => 'datetime',
+    ];
 
     public function members()
     {
@@ -39,5 +49,10 @@ class Store extends Model
     public function purchases()
     {
         return $this->hasMany(Purchase::class);
+    }
+    public function isSubscriptionActive(): bool
+    {
+        // Cek apakah tombol lunas aktif DAN tanggal berakhirnya masih di masa depan
+        return $this->is_active && $this->subscription_until && $this->subscription_until->isFuture();
     }
 }

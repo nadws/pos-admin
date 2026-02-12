@@ -3,7 +3,6 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\OrderResource\Pages;
-use App\Filament\Resources\OrderResource\RelationManagers;
 use App\Models\Order;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -11,33 +10,83 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
+use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Auth;
 
 class OrderResource extends Resource
 {
     protected static ?string $model = Order::class;
-
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
     protected static ?string $navigationGroup = 'Transaksi';
-
     protected static ?string $tenantOwnershipRelationshipName = 'store';
+
+    /**
+     * SATPAM 1: Mengunci menu di Sidebar
+     */
+    public static function canViewAny(): bool
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $tenant = Filament::getTenant();
+
+        // Super Admin bebas lewat
+        if ($user && $user->is_admin) {
+            return true;
+        }
+
+        if (!$tenant) return false;
+
+        // Cek Status Lunas & Masa Aktif
+        if ($tenant->is_active) {
+            return $tenant->subscription_until === null || now()->lte($tenant->subscription_until);
+        }
+
+        // Cek Masa Trial 30 Hari
+        $daysSinceJoined = $tenant->created_at->diffInDays(now());
+        return $daysSinceJoined <= 30;
+    }
+
+    /**
+     * SATPAM 2: Mengunci data agar tidak muncul jika diakses lewat URL
+     */
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $tenant = Filament::getTenant();
+
+        if ($user && $user->is_admin) return $query;
+        if (!$tenant) return $query->whereRaw('1 = 0');
+
+        // Logika Gembok Otomatis
+        $daysSinceJoined = $tenant->created_at->diffInDays(now());
+        $isSubscriptionActive = $tenant->is_active && ($tenant->subscription_until === null || now()->lte($tenant->subscription_until));
+        $isTrialActive = !$tenant->is_active && $daysSinceJoined <= 30;
+
+        if (!$isSubscriptionActive && !$isTrialActive) {
+            return $query->whereRaw('1 = 0'); // Paksa data kosong
+        }
+
+        return $query;
+    }
 
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
-                // Bagian Kiri: Info Utama
                 Section::make('Info Order')
                     ->columns(2)
                     ->schema([
                         TextInput::make('invoice_number')
-                            ->disabled() // Gaboleh diedit
-                            ->dehydrated(false), // Gak perlu disave lagi
+                            ->disabled()
+                            ->dehydrated(false),
 
                         TextInput::make('customer_name')
                             ->label('Nama Pelanggan'),
@@ -58,16 +107,15 @@ class OrderResource extends Resource
                             ->required(),
                     ]),
 
-                // Bagian Bawah: Daftar Menu yang Dibeli
                 Section::make('Daftar Menu')
                     ->schema([
-                        Repeater::make('items') // Relasi ke items()
+                        Repeater::make('items')
                             ->relationship()
                             ->schema([
                                 Select::make('product_id')
                                     ->relationship('product', 'name')
                                     ->label('Menu')
-                                    ->disabled(), // Readonly aja
+                                    ->disabled(),
 
                                 TextInput::make('quantity')
                                     ->numeric()
@@ -80,8 +128,8 @@ class OrderResource extends Resource
                                     ->label('Harga Satuan')
                                     ->disabled(),
                             ])
-                            ->addable(false) // Gaboleh tambah item manual
-                            ->deletable(false) // Gaboleh hapus item
+                            ->addable(false)
+                            ->deletable(false)
                             ->columns(3)
                             ->columnSpanFull()
                     ])
@@ -92,25 +140,21 @@ class OrderResource extends Resource
     {
         return $table
             ->columns([
-                // 1. Nomor Invoice (Bisa dicari)
                 TextColumn::make('invoice_number')
                     ->label('No. Invoice')
                     ->searchable()
                     ->sortable()
                     ->weight('bold'),
 
-                // 2. Nama Pelanggan
                 TextColumn::make('customer_name')
                     ->label('Pelanggan')
                     ->searchable(),
 
-                // 3. Total Harga (Format Rupiah)
                 TextColumn::make('total_price')
                     ->label('Total Bayar')
                     ->money('IDR')
                     ->sortable(),
 
-                // 4. Metode Bayar
                 TextColumn::make('payment_method')
                     ->label('Pembayaran')
                     ->badge()
@@ -120,28 +164,23 @@ class OrderResource extends Resource
                         default => 'gray',
                     }),
 
-                // 5. Status Pesanan (Warna-warni)
                 TextColumn::make('status')
                     ->badge()
                     ->color(fn(string $state): string => match ($state) {
-                        'pending' => 'warning', // Kuning (Belum dimasak)
-                        'ready'   => 'success', // Hijau (Siap Saji)
-                        'cancel'  => 'danger',  // Merah (Batal)
+                        'pending' => 'warning',
+                        'ready'   => 'success',
+                        'cancel'  => 'danger',
                         default   => 'gray',
                     }),
 
-                // 6. Tanggal Transaksi
                 TextColumn::make('created_at')
                     ->label('Waktu')
                     ->dateTime('d M Y, H:i')
                     ->sortable(),
             ])
-            ->defaultSort('created_at', 'desc') // Order terbaru paling atas
-            ->filters([
-                // Nanti kita bisa tambah filter tanggal di sini
-            ])
+            ->defaultSort('created_at', 'desc')
+            ->filters([])
             ->actions([
-                // Tombol Edit/View
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([
@@ -149,13 +188,6 @@ class OrderResource extends Resource
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
-    }
-
-    public static function getRelations(): array
-    {
-        return [
-            //
-        ];
     }
 
     public static function getPages(): array

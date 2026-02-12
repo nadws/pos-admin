@@ -3,7 +3,6 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ProductResource\Pages;
-use App\Filament\Resources\ProductResource\RelationManagers;
 use App\Models\Product;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -11,22 +10,79 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Filament\Forms\Components\FileUpload; // Jangan lupa import ini
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\Textarea;
-
 use Filament\Facades\Filament;
 
 class ProductResource extends Resource
 {
     protected static ?string $model = Product::class;
-
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
     protected static ?string $navigationGroup = 'Manajemen Produk';
     protected static ?string $tenantOwnershipRelationshipName = 'store';
+
+    /**
+     * SATPAM 1: Mengatur siapa yang bisa melihat menu di Sidebar
+     */
+    public static function canViewAny(): bool
+    {
+        $tenant = Filament::getTenant();
+        $user = auth()->user();
+
+        // 1. Super Admin selalu bebas masuk
+        if ($user->is_admin) {
+            return true;
+        }
+
+        // Jika tenant tidak ditemukan (misal saat proses login), sembunyikan menu
+        if (!$tenant) {
+            return false;
+        }
+
+        // 2. Jika Toko sudah lunas (is_active = 1), cek masa aktifnya
+        if ($tenant->is_active) {
+            return $tenant->subscription_until === null || now()->lte($tenant->subscription_until);
+        }
+
+        // 3. Jika belum lunas, cek apakah masih dalam masa trial 30 hari
+        $daysSinceJoined = $tenant->created_at->diffInDays(now());
+
+        return $daysSinceJoined <= 30;
+    }
+
+    /**
+     * SATPAM 2: Mengunci data agar tidak muncul jika diakses lewat URL langsung
+     */
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+        $user = auth()->user();
+        $tenant = Filament::getTenant();
+
+        // Admin bisa melihat semua
+        if ($user->is_admin) {
+            return $query;
+        }
+
+        if (!$tenant) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        // Logika Gembok: Harus Lunas ATAU Masih Trial
+        $daysSinceJoined = $tenant->created_at->diffInDays(now());
+        $isSubscriptionActive = $tenant->is_active && ($tenant->subscription_until === null || now()->lte($tenant->subscription_until));
+        $isTrialActive = !$tenant->is_active && $daysSinceJoined <= 30;
+
+        if (!$isSubscriptionActive && !$isTrialActive) {
+            // Jika expired dan tidak lunas, kosongkan hasil query
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query;
+    }
 
     public static function form(Form $form): Form
     {
@@ -37,48 +93,35 @@ class ProductResource extends Resource
                     ->relationship(
                         name: 'category',
                         titleAttribute: 'name',
-                        // 👇 TAMBAHKAN LOGIKA FILTER INI 👇
-                        modifyQueryUsing: function (Builder $query) {
-                            // Ambil ID Toko yang sedang aktif di URL (Tenant)
-                            $tenantId = Filament::getTenant()->id;
-
-                            // Filter query: Hanya ambil kategori milik toko tersebut
-                            return $query->where('store_id', $tenantId);
-                        },
+                        modifyQueryUsing: fn(Builder $query) => $query->where('store_id', Filament::getTenant()->id)
                     )
                     ->required(),
 
-                // Nama Menu
                 TextInput::make('name')
                     ->required()
                     ->label('Nama Menu'),
 
-                // Harga (Pakai prefix Rp biar ganteng)
                 TextInput::make('price')
                     ->required()
                     ->numeric()
                     ->prefix('Rp')
                     ->label('Harga'),
 
-                // Stok
                 TextInput::make('stock')
                     ->numeric()
                     ->default(100)
                     ->label('Stok Awal'),
 
-                // Upload Gambar
                 FileUpload::make('image')
-                    ->disk('public') // <--- Pastikan ada ini (atau sesuaikan default filesystem)
+                    ->disk('public')
                     ->directory('products')
-                    ->visibility('public') // <--- Pastikan ini public
+                    ->visibility('public')
                     ->image(),
 
-                // Status Tersedia
                 Toggle::make('is_available')
                     ->label('Tersedia?')
                     ->default(true),
 
-                // Deskripsi
                 Textarea::make('description')
                     ->columnSpanFull(),
             ]);
@@ -88,35 +131,28 @@ class ProductResource extends Resource
     {
         return $table
             ->columns([
-                // 1. Kolom Gambar (Taruh depan biar cakep)
                 Tables\Columns\ImageColumn::make('image')
-                    ->disk('public') // <--- Paksa baca dari folder public
-                    ->visibility('public')
+                    ->disk('public')
                     ->label('Foto'),
 
-                // 2. Nama Menu
                 Tables\Columns\TextColumn::make('name')
                     ->label('Nama Menu')
                     ->searchable(),
 
-                // 3. Kategori (Hapus numeric!)
                 Tables\Columns\TextColumn::make('category.name')
                     ->label('Kategori')
                     ->sortable(),
 
-                // 4. Harga (Format Rupiah)
                 Tables\Columns\TextColumn::make('price')
                     ->label('Harga')
-                    ->money('IDR') // Otomatis jadi Rp ...
+                    ->money('IDR')
                     ->sortable(),
 
-                // 5. Stok
                 Tables\Columns\TextColumn::make('stock')
                     ->label('Stok')
                     ->numeric()
                     ->sortable(),
 
-                // 6. Status Tersedia
                 Tables\Columns\IconColumn::make('is_available')
                     ->label('Aktif')
                     ->boolean(),
@@ -126,25 +162,15 @@ class ProductResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->filters([
-                //
-            ])
+            ->filters([])
             ->actions([
                 Tables\Actions\EditAction::make(),
-
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
-    }
-
-    public static function getRelations(): array
-    {
-        return [
-            //
-        ];
     }
 
     public static function getPages(): array
