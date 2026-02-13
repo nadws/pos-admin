@@ -24,8 +24,7 @@ class UserResource extends Resource
     protected static ?string $navigationGroup = 'Administrasi';
     protected static ?string $navigationLabel = 'Kelola User';
 
-    // 👇👇👇 INI KUNCI PERBAIKANNYA 👇👇👇
-    // Memberitahu Filament bahwa relasi ke toko namanya 'stores' (jamak), bukan 'store'
+
     protected static ?string $tenantOwnershipRelationshipName = 'stores';
     protected static ?string $tenantRelationshipName = 'members';
 

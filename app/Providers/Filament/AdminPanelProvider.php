@@ -19,7 +19,9 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use App\Models\Store;
 use App\Filament\Pages\Tenancy\RegisterStore;
-
+// Import tambahan untuk Render Hook
+use Filament\Support\Facades\FilamentView;
+use Illuminate\Support\Facades\Blade;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -31,21 +33,16 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->registration()
-            ->tenant(Store::class)
-            ->tenant(Store::class, ownershipRelationship: 'stores') // 'stores' adalah relasi di model User
+            ->tenant(Store::class, slugAttribute: 'slug', ownershipRelationship: 'stores')
             ->tenantRegistration(RegisterStore::class)
             ->brandName(new \Illuminate\Support\HtmlString(
                 '<span style="color: #111827; font-weight: 800;">UWAIS</span><span style="color: #3B82F6; font-weight: 800;">POS</span>'
             ))
-
-
             ->colors([
                 'primary' => Color::hex('#1E40AF'),
                 'gray' => Color::Slate,
             ])
             ->font('Inter')
-
-
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
@@ -54,7 +51,6 @@ class AdminPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
                 // Widgets\AccountWidget::class,
-                // Widgets\FilamentInfoWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,
@@ -70,5 +66,7 @@ class AdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
             ]);
+        // --- BAGIAN TAMBAHAN: CSS SAKTI UNTUK PRINT ---
+
     }
 }
