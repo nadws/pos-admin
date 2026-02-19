@@ -13,6 +13,7 @@ class Store extends Model
         'slug',
         'is_active',
         'subscription_until',
+        'user_id',
     ];
 
     protected $casts = [
