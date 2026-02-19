@@ -153,7 +153,7 @@
                         <p class="text-sm font-bold text-gray-400">Hanya</p>
                         <div class="flex justify-center items-start gap-1">
                             <span class="text-2xl font-bold mt-2 text-gray-800">Rp</span>
-                            <span class="text-7xl font-black text-[#111827]">300k</span>
+                            <span class="text-7xl font-black text-[#111827]">500k</span>
                         </div>
                         <p class="text-gray-400 font-bold mt-2 italic text-sm">per tahun</p>
                     </div>
