@@ -7,6 +7,7 @@
     <title>Uwais POS - Solusi Kasir Digital Modern</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -16,14 +17,12 @@
             font-family: 'Plus Jakarta Sans', sans-serif;
         }
 
-        /* Navigasi transparan saat scroll */
         .nav-blur {
-            background: rgba(255, 255, 255, 0.8);
+            background: rgba(255, 255, 255, 0.85);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
         }
 
-        /* Animasi mengapung untuk mockup HP */
         @keyframes float {
 
             0%,
@@ -40,7 +39,6 @@
             animation: float 6s ease-in-out infinite;
         }
 
-        /* Gradient halus untuk background */
         .bg-soft {
             background: radial-gradient(circle at top right, #eff6ff, transparent),
                 radial-gradient(circle at bottom left, #f8fafc, transparent);
@@ -48,7 +46,7 @@
     </style>
 </head>
 
-<body class="bg-soft text-[#1F2937] antialiased">
+<body class="bg-soft text-[#1F2937] antialiased" x-data="{ mobileMenuOpen: false }">
 
     <nav class="fixed top-0 left-0 right-0 z-50 nav-blur border-b border-gray-100/50">
         <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -62,18 +60,41 @@
             </div>
 
             <div
-                class="hidden md:flex items-center gap-10 text-[11px] font-bold text-gray-400 uppercase tracking-[0.2em]">
+                class="hidden lg:flex items-center gap-10 text-[11px] font-bold text-gray-400 uppercase tracking-[0.2em]">
                 <a href="#fitur" class="hover:text-blue-700 transition-colors">Fitur</a>
                 <a href="#harga" class="hover:text-blue-700 transition-colors">Harga</a>
                 <a href="#kontak" class="text-blue-600 font-black italic">Berlangganan</a>
             </div>
 
-            <div class="flex items-center gap-3">
+            <div class="hidden lg:flex items-center gap-3">
                 <a href="{{ url('/admin/login') }}"
                     class="text-sm font-bold text-gray-600 hover:text-blue-700 px-4 py-2">Masuk</a>
                 <a href="{{ url('/admin/register') }}"
-                    class="bg-[#1E40AF] text-white px-6 py-3 rounded-2xl text-sm font-bold shadow-xl shadow-blue-100 hover:bg-blue-800 hover:-translate-y-0.5 transition-all">Uji
-                    Coba 1 Bulan Gratis</a>
+                    class="bg-[#1E40AF] text-white px-6 py-3 rounded-2xl text-sm font-bold shadow-xl shadow-blue-100 hover:bg-blue-800 transition-all">Uji
+                    Coba Gratis</a>
+            </div>
+
+            <button @click="mobileMenuOpen = !mobileMenuOpen" class="lg:hidden text-gray-600 focus:outline-none p-2">
+                <i class="fa-solid transition-all duration-300"
+                    :class="mobileMenuOpen ? 'fa-xmark text-2xl' : 'fa-bars-staggered text-2xl'"></i>
+            </button>
+        </div>
+
+        <div x-show="mobileMenuOpen" x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 -translate-y-4" x-transition:enter-end="opacity-100 translate-y-0"
+            x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0"
+            x-transition:leave-end="opacity-0 -translate-y-4"
+            class="lg:hidden bg-white border-b border-gray-100 px-6 py-8 space-y-6 shadow-2xl">
+            <div class="flex flex-col gap-6 text-sm font-bold text-gray-500 uppercase tracking-widest text-center">
+                <a @click="mobileMenuOpen = false" href="#fitur">Fitur</a>
+                <a @click="mobileMenuOpen = false" href="#harga">Harga</a>
+                <a @click="mobileMenuOpen = false" href="#kontak" class="text-blue-600">Berlangganan</a>
+            </div>
+            <div class="flex flex-col gap-3 pt-6 border-t border-gray-50">
+                <a href="{{ url('/admin/login') }}" class="text-center py-3 font-bold text-gray-600">Masuk</a>
+                <a href="{{ url('/admin/register') }}"
+                    class="bg-[#1E40AF] text-white text-center py-4 rounded-2xl font-bold shadow-lg shadow-blue-100">Uji
+                    Coba Gratis</a>
             </div>
         </div>
     </nav>
@@ -105,7 +126,7 @@
 
                 <div class="flex flex-col sm:flex-row justify-center lg:justify-start gap-4">
                     <a href="#harga"
-                        class="bg-[#111827] text-white px-10 py-5 rounded-[1.5rem] font-bold hover:bg-gray-800 transition-all shadow-2xl shadow-gray-200">
+                        class="bg-[#111827] text-white px-10 py-5 rounded-[1.5rem] font-bold hover:bg-gray-800 transition-all shadow-2xl shadow-gray-200 text-center">
                         Cek Detail Harga
                     </a>
                     <a href="https://wa.me/6285821875178?text=Halo%20Admin%20Uwais%20POS,%20saya%20tertarik%20berlangganan%20paket%20500rb/tahun"
@@ -118,13 +139,13 @@
             <div class="flex-1 relative flex justify-center order-1 lg:order-2">
                 <div class="relative animate-float">
                     <div
-                        class="relative mx-auto border-gray-900 bg-gray-900 border-[12px] rounded-[3.5rem] h-[500px] w-[250px] md:h-[600px] md:w-[300px] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.2)] overflow-hidden">
-                        <img src="{{ asset('image/dashboard.jpeg') }}" alt="Dashboard"
+                        class="relative mx-auto border-gray-900 bg-gray-900 border-[12px] rounded-[3.5rem] h-[480px] w-[240px] md:h-[600px] md:w-[300px] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.2)] overflow-hidden">
+                        <img src="{{ asset('image/dashboard.jpeg') }}" alt="Dashboard Uwais POS"
                             class="w-full h-full object-cover">
                     </div>
 
                     <div
-                        class="absolute -bottom-6 -left-8 md:-left-12 bg-white/95 backdrop-blur p-6 rounded-[2.5rem] shadow-2xl border border-blue-50 hidden sm:block">
+                        class="absolute -bottom-6 -left-8 bg-white/95 backdrop-blur p-6 rounded-[2.5rem] shadow-2xl border border-blue-50 hidden sm:block">
                         <div class="flex items-center gap-4">
                             <div
                                 class="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
@@ -144,19 +165,18 @@
     </header>
 
     <section class="max-w-7xl mx-auto px-6 py-12">
-        <div
-            class="grid grid-cols-1 md:grid-cols-3 gap-8 bg-[#1E40AF] rounded-[3.5rem] p-12 text-white shadow-[0_30px_60px_-15px_rgba(30,64,175,0.4)]">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 bg-[#1E40AF] rounded-[3.5rem] p-12 text-white shadow-2xl">
             <div class="text-center">
                 <p class="text-5xl font-black mb-2 tracking-tight">100%</p>
-                <p class="text-blue-200 text-[10px] font-extrabold uppercase tracking-[0.2em]">Data Cloud Aman</p>
+                <p class="text-blue-200 text-[10px] font-extrabold uppercase tracking-widest">Data Cloud Aman</p>
             </div>
             <div class="text-center border-y md:border-y-0 md:border-x border-blue-400/30 py-8 md:py-0">
                 <p class="text-5xl font-black mb-2 tracking-tight">500+</p>
-                <p class="text-blue-200 text-[10px] font-extrabold uppercase tracking-[0.2em]">UMKM Terdaftar</p>
+                <p class="text-blue-200 text-[10px] font-extrabold uppercase tracking-widest">UMKM Terdaftar</p>
             </div>
             <div class="text-center">
                 <p class="text-5xl font-black mb-2 tracking-tight">15MB</p>
-                <p class="text-blue-200 text-[10px] font-extrabold uppercase tracking-[0.2em]">App Super Ringan</p>
+                <p class="text-blue-200 text-[10px] font-extrabold uppercase tracking-widest">App Super Ringan</p>
             </div>
         </div>
     </section>
@@ -164,9 +184,7 @@
     <section id="harga" class="py-32">
         <div class="max-w-7xl mx-auto px-6 text-center">
             <h2 class="text-4xl md:text-5xl font-[900] tracking-tighter mb-4 text-[#111827]">Harga Transparan.</h2>
-            <p class="text-gray-500 mb-16 max-w-sm mx-auto">Satu investasi untuk sukses jangka panjang bisnis Anda.</p>
-
-            <div class="max-w-md mx-auto relative group">
+            <div class="max-w-md mx-auto relative mt-16 group">
                 <div
                     class="absolute -inset-4 bg-blue-600 rounded-[4.5rem] blur opacity-10 group-hover:opacity-20 transition duration-500">
                 </div>
@@ -175,8 +193,7 @@
                     <span
                         class="bg-blue-600 text-white text-[10px] font-black px-6 py-2 rounded-full uppercase tracking-widest">Paling
                         Populer</span>
-
-                    <div class="mt-12 mb-12">
+                    <div class="mt-12 mb-12 text-center">
                         <p class="text-sm font-bold text-gray-400 uppercase tracking-widest">Hanya</p>
                         <div class="flex justify-center items-start gap-1">
                             <span class="text-3xl font-bold mt-3 text-gray-800 tracking-tight">Rp</span>
@@ -184,26 +201,17 @@
                         </div>
                         <p class="text-gray-400 font-bold mt-2 italic">per tahun</p>
                     </div>
-
                     <div class="space-y-5 mb-12 text-left border-t border-gray-50 pt-10">
-                        <div class="flex items-center gap-4 text-sm font-semibold text-gray-700">
-                            <i class="fas fa-check-circle text-blue-600 text-xl"></i> Transaksi Unlimited
-                        </div>
-                        <div class="flex items-center gap-4 text-sm font-semibold text-gray-700">
-                            <i class="fas fa-check-circle text-blue-600 text-xl"></i> Laporan Omzet & Laba
-                        </div>
-                        <div class="flex items-center gap-4 text-sm font-semibold text-gray-700">
-                            <i class="fas fa-check-circle text-blue-600 text-xl"></i> Cetak Struk Bluetooth
-                        </div>
-                        <div class="flex items-center gap-4 text-sm font-semibold text-gray-700">
-                            <i class="fas fa-check-circle text-blue-600 text-xl"></i> Akses Multi-Device
-                        </div>
+                        <div class="flex items-center gap-4 text-sm font-semibold text-gray-700"><i
+                                class="fas fa-check-circle text-blue-600 text-xl"></i> Transaksi Unlimited</div>
+                        <div class="flex items-center gap-4 text-sm font-semibold text-gray-700"><i
+                                class="fas fa-check-circle text-blue-600 text-xl"></i> Laporan Omzet & Laba</div>
+                        <div class="flex items-center gap-4 text-sm font-semibold text-gray-700"><i
+                                class="fas fa-check-circle text-blue-600 text-xl"></i> Cetak Struk Bluetooth</div>
                     </div>
-
                     <a href="#kontak"
-                        class="block w-full bg-[#111827] text-white py-5 rounded-[1.5rem] font-[800] hover:bg-gray-800 transition-all hover:scale-[1.02] shadow-xl">
-                        Mulai Berlangganan
-                    </a>
+                        class="block w-full bg-[#111827] text-white py-5 rounded-[1.5rem] font-[800] hover:bg-gray-800 transition-all text-center">Mulai
+                        Berlangganan</a>
                 </div>
             </div>
         </div>
@@ -215,47 +223,35 @@
             <div class="z-10 text-center lg:text-left">
                 <h2 class="text-4xl md:text-5xl font-[900] tracking-tighter mb-8 leading-tight">Siap Untuk <br
                         class="hidden lg:block"> Go Digital?</h2>
-                <p class="text-blue-100 text-lg mb-10 max-w-sm mx-auto lg:mx-0">Konsultasi gratis atau kirim bukti
-                    pembayaran melalui WhatsApp admin kami.</p>
                 <a href="https://wa.me/6285821875178?text=Halo%20Admin%20Uwais%20POS,%20saya%20tertarik%20berlangganan%20paket%20500rb/tahun"
                     target="_blank"
-                    class="inline-flex items-center gap-4 bg-white text-blue-700 px-10 py-5 rounded-[1.5rem] font-bold shadow-2xl hover:bg-gray-50 transition-all active:scale-95">
+                    class="inline-flex items-center gap-4 bg-white text-blue-700 px-10 py-5 rounded-[1.5rem] font-bold shadow-2xl hover:bg-gray-50 transition-all">
                     <i class="fab fa-whatsapp text-2xl"></i> Chat Admin Sekarang
                 </a>
             </div>
-
             <div class="z-10 w-full lg:w-auto">
                 <div class="bg-blue-500/20 p-10 rounded-[3rem] border border-white/10 backdrop-blur-sm">
-                    <p
-                        class="text-[10px] uppercase tracking-[0.3em] font-black text-blue-200 mb-6 text-center lg:text-left">
-                        Dukungan Pembayaran</p>
+                    <p class="text-[10px] uppercase tracking-[0.3em] font-black text-blue-200 mb-6 text-center">Metode
+                        Pembayaran</p>
                     <div
-                        class="flex flex-wrap justify-center lg:justify-start gap-8 opacity-80  grayscale invert font-[900] italic text-xl">
-                        <span class="text-white">BANK</span> <span class="text-white">QRIS</span>
-                        <span class="text-white">E-WALLET</span>
+                        class="flex flex-wrap justify-center gap-8 opacity-80 grayscale invert font-black italic text-xl">
+                        <span>BANK</span> <span>QRIS</span> <span>E-WALLET</span>
                     </div>
                 </div>
-            </div>
-
-            <div class="absolute top-0 right-0 w-80 h-80 bg-blue-500 rounded-full -mr-20 -mt-20 opacity-20 blur-3xl">
             </div>
         </div>
     </section>
 
-    <footer class="bg-white py-16 border-t border-gray-100">
+    <footer class="bg-white py-16 border-t border-gray-100 text-center md:text-left">
         <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-8">
             <div class="flex items-center gap-2">
-                <div class="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center">
-                    <span class="text-white font-bold text-sm">U</span>
-                </div>
                 <span class="font-bold tracking-tight text-gray-900">UWAIS POS.</span>
             </div>
-            <p class="text-gray-400 text-[10px] font-extrabold uppercase tracking-[0.2em]">© 2026 Uwais POS. All Rights
+            <p class="text-gray-400 text-[10px] font-extrabold uppercase tracking-widest">© 2026 Uwais POS. All Rights
                 Reserved.</p>
             <div class="flex gap-8 text-[10px] font-extrabold uppercase tracking-widest text-gray-400">
-                <a href="#" class="hover:text-blue-600 transition">Privacy</a>
-                <a href="#" class="hover:text-blue-600 transition">Terms</a>
-                <a href="#" class="hover:text-blue-600 transition">Support</a>
+                <a href="#" class="hover:text-blue-600">Privacy</a>
+                <a href="#" class="hover:text-blue-600">Terms</a>
             </div>
         </div>
     </footer>
