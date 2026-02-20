@@ -14,7 +14,7 @@ class RegisterStore extends RegisterTenant
 {
     public static function getLabel(): string
     {
-        return 'Buat Restoran Baru';
+        return 'Buat Usaha Baru';
     }
 
     public function form(Form $form): Form
@@ -22,7 +22,7 @@ class RegisterStore extends RegisterTenant
         return $form
             ->schema([
                 TextInput::make('name')
-                    ->label('Nama Restoran')
+                    ->label('Nama Usaha')
                     ->required()
                     ->live(onBlur: true)
                     ->afterStateUpdated(fn(Set $set, ?string $state) =>
