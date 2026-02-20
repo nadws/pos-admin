@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\Auth\CustomRegister;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -32,7 +33,7 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
-            ->registration()
+            ->registration(CustomRegister::class)
             ->tenant(Store::class, slugAttribute: 'slug', ownershipRelationship: 'stores')
             ->tenantRegistration(RegisterStore::class)
             ->brandName(new \Illuminate\Support\HtmlString(

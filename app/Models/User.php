@@ -28,7 +28,10 @@ class User extends Authenticatable implements FilamentUser, HasTenants
         'password',
         'role',
         'pin',
-        // 'store_id' <--- 3. SUDAH DIHAPUS (Karena sekarang pakai tabel store_user)
+        'phone',
+        'address',
+        'identity_number',
+
     ];
 
     protected $hidden = [
