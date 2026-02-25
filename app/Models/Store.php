@@ -56,4 +56,8 @@ class Store extends Model
         // Cek apakah tombol lunas aktif DAN tanggal berakhirnya masih di masa depan
         return $this->is_active && $this->subscription_until && $this->subscription_until->isFuture();
     }
+    public function stockOpnames(): HasMany
+    {
+        return $this->hasMany(StockOpname::class);
+    }
 }
