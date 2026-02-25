@@ -4,8 +4,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Uwais POS - Solusi Kasir Digital Modern</title>
 
+    <!-- PRIMARY META -->
+    <title>Uwais POS - Solusi Kasir Digital Modern</title>
+    <meta name="title" content="Uwais POS - Solusi Kasir Digital Modern">
+    <meta name="description"
+        content="Sistem kasir cloud modern untuk UMKM. Transaksi unlimited, laporan real-time, cetak struk bluetooth. Hanya 500rb per tahun.">
+
+    <!-- OPEN GRAPH / FACEBOOK / WHATSAPP -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://uwaispos.online/">
+    <meta property="og:title" content="Uwais POS - Solusi Kasir Digital Modern">
+    <meta property="og:description"
+        content="Lupakan pencatatan manual. Uwais POS hadir dengan fitur manajemen stok dan laporan real-time untuk mempercepat pertumbuhan toko Anda.">
+    <meta property="og:image" content="https://uwaispos.online/image/dashboard.jpeg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+
+    <!-- TWITTER -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Uwais POS - Solusi Kasir Digital Modern">
+    <meta name="twitter:description"
+        content="Sistem kasir cloud modern untuk UMKM. Transaksi unlimited, laporan lengkap, harga hanya 500rb per tahun.">
+    <meta name="twitter:image" content="https://uwaispos.online/image/dashboard.jpeg">
+
+    <!-- FAVICON (opsional tapi bagus) -->
+    <link rel="icon" type="image/png" href="https://uwaispos.online/image/dashboard.jpeg">
+
+    <!-- FONT & STYLE -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
