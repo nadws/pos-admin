@@ -402,35 +402,70 @@ class PosController extends Controller
 
     public function markAsReady(Request $request, $orderId)
     {
-        // 1. Cari Pesanannya
-        $order = Order::with('items.product.ingredients')->find($orderId);
+        // 1. Cari Pesanannya dengan relasi yang benar
+        // Kita panggil recipes (relasi di model Product) dan unit dasarnya
+        $order = Order::with('items.product.recipes.ingredient.unit')->find($orderId);
+
+        if (!$order) {
+            return response()->json(['message' => 'Pesanan tidak ditemukan'], 404);
+        }
 
         if ($order->status == 'ready') {
             return response()->json(['message' => 'Pesanan sudah selesai sebelumnya'], 400);
         }
 
-        // 2. MULAI TRANSAKSI DATABASE (Penting! Biar aman)
+        // 2. MULAI TRANSAKSI DATABASE
         DB::transaction(function () use ($order) {
 
-            // 3. Looping setiap menu yang dipesan (Misal: Nasi Goreng, Es Teh)
+            // 3. Looping setiap item yang dipesan (Misal: Nasi Goreng)
             foreach ($order->items as $item) {
+                $product = $item->product;
 
-                // 4. Looping bahan baku dari menu tersebut (Resep)
-                // Asumsi kamu punya relasi product -> ingredients
-                foreach ($item->product->ingredients as $ingredient) {
+                // Cek apakah produk ini menggunakan resep
+                if ($product && $product->is_recipe) {
 
-                    // Rumus: Stok Lama - (Jumlah Pemakaian per Porsi * Jumlah Pesanan)
-                    $qtyUsed = $ingredient->pivot->amount * $item->quantity;
+                    // 4. Looping bahan baku (RecipeItem)
+                    foreach ($product->recipes as $recipe) {
+                        $ingredient = $recipe->ingredient; // Ini adalah Product (Bahan Baku)
 
-                    // Kurangi Stok di Tabel Inventory
-                    $ingredient->inventory->decrement('stock', $qtyUsed);
+                        if ($ingredient) {
+                            /**
+                             * LOGIC KONVERSI:
+                             * Kita harus hitung pemakaian dalam SATUAN DASAR bahan baku tersebut.
+                             * 1. Cari tau multiplier satuan yang dipilih di resep.
+                             */
+
+                            $multiplier = 1; // Default jika pakai satuan dasar
+
+                            // Jika satuan di resep BUKAN satuan dasar bahan baku, cari di tabel konversi
+                            if ($recipe->unit_id != $ingredient->unit_id) {
+                                $conversion = \App\Models\UnitConversion::where('product_id', $ingredient->id)
+                                    ->where('from_unit_id', $recipe->unit_id)
+                                    ->first();
+
+                                $multiplier = $conversion ? $conversion->multiplier : 1;
+                            }
+
+                            // Rumus: (Qty di Resep * Multiplier) * Qty Pesanan
+                            // Contoh: (0.5 Kg * 1000) * 2 porsi = 1000 Gram
+                            $totalDeduct = ($recipe->quantity * $multiplier) * $item->quantity;
+
+                            // 5. Kurangi Stok di tabel products (kolom stock)
+                            $ingredient->decrement('stock', $totalDeduct);
+                        }
+                    }
+                } else {
+                    // Jika produk jualan langsung (gak pake resep), kurangi stok produk itu sendiri
+                    if ($product && $product->track_stock) {
+                        $product->decrement('stock', $item->quantity);
+                    }
                 }
             }
 
-            // 5. Update Status Pesanan jadi 'ready' (Selesai Masak)
+            // 6. Update Status Pesanan
             $order->update(['status' => 'ready']);
         });
 
-        return response()->json(['message' => 'Status update & Stok berkurang!']);
+        return response()->json(['message' => 'Status update & Stok bahan baku berkurang!']);
     }
 }
