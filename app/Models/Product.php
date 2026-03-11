@@ -33,4 +33,13 @@ class Product extends Model
     {
         return $this->hasMany(RecipeItem::class, 'product_id');
     }
+    public function unitConversions()
+    {
+        return $this->hasMany(UnitConversion::class);
+    }
+
+    public function unit()
+    {
+        return $this->belongsTo(Unit::class);
+    }
 }

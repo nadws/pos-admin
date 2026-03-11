@@ -1,0 +1,28 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('products', function (Blueprint $table) {
+            // Tambahkan kolom unit_id setelah category_id
+            $table->foreignId('unit_id')
+                ->nullable() // Nullable dulu biar produk lama gak error
+                ->after('category_id')
+                ->constrained('units')
+                ->nullOnDelete();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('products', function (Blueprint $table) {
+            $table->dropForeign(['unit_id']);
+            $table->dropColumn('unit_id');
+        });
+    }
+};
