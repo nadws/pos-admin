@@ -171,7 +171,8 @@ class ProductResource extends Resource
                     ->label('Stok')
                     ->formatStateUsing(fn($record) => $record->is_recipe ? 'Auto' : $record->stock . ' ' . ($record->unit?->name ?? '')),
             ])
-            ->actions([Tables\Actions\EditAction::make()]);
+            ->defaultSort('id', 'desc')
+            ->actions([Tables\Actions\EditAction::make(), Tables\Actions\DeleteAction::make(),]);
     }
 
     public static function getPages(): array

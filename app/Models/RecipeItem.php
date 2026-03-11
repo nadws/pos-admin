@@ -9,7 +9,8 @@ class RecipeItem extends Model
     protected $fillable = [
         'product_id',
         'ingredient_id',
-        'quantity'
+        'quantity',
+        'unit_id',
     ];
 
     // Relasi balik ke Produk yang dijual (misal: Risol)
