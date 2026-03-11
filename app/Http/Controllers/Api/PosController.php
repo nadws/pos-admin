@@ -27,6 +27,9 @@ class PosController extends Controller
         $products = $store->products()
             ->where('is_available', true)
             ->with('category')
+            ->whereHas('category', function ($query) {
+                $query->where('name', 'NOT LIKE', '%Bahan Baku%');
+            })
             ->latest()
             ->get();
 
