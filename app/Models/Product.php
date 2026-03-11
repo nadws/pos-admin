@@ -28,4 +28,9 @@ class Product extends Model
     {
         return $this->hasMany(PurchaseItem::class);
     }
+
+    public function recipes()
+    {
+        return $this->hasMany(RecipeItem::class, 'product_id');
+    }
 }
