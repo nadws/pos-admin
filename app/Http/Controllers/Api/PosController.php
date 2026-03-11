@@ -345,42 +345,77 @@ class PosController extends Controller
     // 11. Update Status Dapur & Potong Stok Produk Langsung
     public function markItemReady($id)
     {
-        // 1. Cari Item berdasarkan ID (bukan Order)
-        $orderItem = OrderItem::with(['product', 'order'])->find($id);
+        // 1. Cari Item dengan relasi resep, bahan baku, dan satuan agar tidak query berulang kali (Eager Loading)
+        $orderItem = OrderItem::with([
+            'product.recipes.ingredient.unit',
+            'order'
+        ])->find($id);
 
         if (!$orderItem) {
-            return response()->json(['message' => 'Item tidak ditemukan'], 404);
+            return response()->json([
+                'success' => false,
+                'message' => 'Item tidak ditemukan'
+            ], 404);
         }
 
-        // 2. Cek apakah item sudah selesai sebelumnya? (Mencegah error/double stok)
+        // 2. Cek apakah item sudah selesai sebelumnya? (Mencegah double potong stok)
         if ($orderItem->status === 'done') {
-            return response()->json(['message' => 'Item ini sudah selesai sebelumnya'], 200);
+            return response()->json([
+                'success' => true,
+                'message' => 'Item ini sudah ditandai selesai sebelumnya'
+            ], 200);
         }
 
         try {
             DB::transaction(function () use ($orderItem) {
-                // A. Potong Stok (Hanya jika ada produk terkait)
+
+                // A. LOGIKA POTONG STOK
                 if ($orderItem->product) {
                     $product = $orderItem->product;
-                    // Pastikan stok tidak minus (opsional)
-                    if ($product->stock >= $orderItem->quantity) {
-                        $product->decrement('stock', $orderItem->quantity);
+
+                    // Jika produk menggunakan RESEP (Contoh: Nasi Goreng)
+                    if ($product->is_recipe) {
+                        foreach ($product->recipes as $recipe) {
+                            $ingredient = $recipe->ingredient;
+
+                            if ($ingredient) {
+                                // 1. Hitung Multiplier Konversi
+                                // Jika satuan di resep berbeda dengan satuan dasar di gudang
+                                $multiplier = 1;
+                                if ($recipe->unit_id != $ingredient->unit_id) {
+                                    $conversion = \App\Models\UnitConversion::where('product_id', $ingredient->id)
+                                        ->where('from_unit_id', $recipe->unit_id)
+                                        ->first();
+
+                                    $multiplier = $conversion ? $conversion->multiplier : 1;
+                                }
+
+                                // 2. Hitung Total yang dipotong: (Qty Resep * Multiplier) * Qty Pesanan
+                                // Contoh: (0.5 Kg * 1000) * 2 Porsi = 1000 Gram
+                                $totalDeduct = ($recipe->quantity * $multiplier) * $orderItem->quantity;
+
+                                // 3. Potong stok bahan baku di tabel products
+                                $ingredient->decrement('stock', $totalDeduct);
+                            }
+                        }
                     } else {
-                        // Jika stok kurang, tetap lanjut atau throw error?
-                        // Di sini kita paksa kurangi saja agar data sinkron
-                        $product->decrement('stock', $orderItem->quantity);
+                        // Jika produk JUALAN LANGSUNG (Contoh: Air Mineral Botol)
+                        if ($product->track_stock) {
+                            $product->decrement('stock', $orderItem->quantity);
+                        }
                     }
                 }
 
                 // B. Update Status Item jadi 'done'
                 $orderItem->update(['status' => 'done']);
 
-                // C. Cek Otomatis: Apakah semua item di meja ini sudah keluar?
-                // Jika ya, ubah status Order induk menjadi 'ready' (siap saji)
+                // C. Cek Otomatis Status Order Induk (Kitchen Logic)
                 $parentOrder = $orderItem->order;
                 if ($parentOrder) {
+                    // Hitung item yang masih 'pending' di order ini
                     $pendingItems = $parentOrder->items()->where('status', '!=', 'done')->count();
 
+                    // Jika semua item sudah 'done', maka pesanan siap saji (ready)
                     if ($pendingItems === 0) {
                         $parentOrder->update(['status' => 'ready']);
                     }
@@ -388,18 +423,18 @@ class PosController extends Controller
             });
 
             return response()->json([
-                'success' => true, // Pakai 'success' agar konsisten dengan frontend
-                'message' => 'Item selesai & stok dikurangi',
+                'success' => true,
+                'message' => 'Item selesai & stok bahan baku berhasil dikurangi',
                 'data' => $orderItem
             ]);
         } catch (\Exception $e) {
+            // Jika ada error, transaksi database akan di-cancel otomatis oleh DB::transaction
             return response()->json([
                 'success' => false,
-                'message' => 'Server Error: ' . $e->getMessage()
+                'message' => 'Gagal memproses stok: ' . $e->getMessage()
             ], 500);
         }
     }
-
     public function markAsReady(Request $request, $orderId)
     {
         // 1. Cari Pesanannya dengan relasi yang benar
