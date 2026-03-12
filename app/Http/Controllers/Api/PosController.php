@@ -8,6 +8,7 @@ use App\Models\Store;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\User;
+use App\Models\StockMutation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -396,6 +397,16 @@ class PosController extends Controller
 
                                 // 3. Potong stok bahan baku di tabel products
                                 $ingredient->decrement('stock', $totalDeduct);
+                                StockMutation::create([
+                                    'product_id' => $ingredient->id,
+                                    'store_id' => $ingredient->store_id,
+                                    'type' => 'out',
+                                    'quantity' => $totalDeduct,
+                                    'reference_stock' => $ingredient->stock + $totalDeduct, // Stok sebelum dikurangi
+                                    'reference_type' => 'order_item',
+                                    'reference_id' => $orderItem->id,
+                                    'description' => "Pemakaian bahan untuk {$orderItem->product->name} (Qty: {$orderItem->quantity})",
+                                ]);
                             }
                         }
                     } else {
