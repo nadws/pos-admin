@@ -4,6 +4,8 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\PurchaseResource\Pages;
 use App\Models\Purchase;
+use App\Models\Product;
+use App\Models\UnitConversion;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -22,39 +24,29 @@ class PurchaseResource extends Resource
     protected static ?string $navigationGroup = 'Manajemen Produk';
     protected static ?string $tenantOwnershipRelationshipName = 'store';
 
-    /**
-     * SATPAM 1: Mengunci menu di Sidebar
-     */
     public static function canViewAny(): bool
     {
         /** @var \App\Models\User $user */
         $user = Auth::user();
         $tenant = Filament::getTenant();
 
-        // Super Admin bebas lewat
         if ($user && $user->is_admin) {
             return true;
         }
 
         if (!$tenant) return false;
 
-        // Cek Status Lunas & Masa Aktif
         if ($tenant->is_active) {
             return $tenant->subscription_until === null || now()->lte($tenant->subscription_until);
         }
 
-        // Cek Masa Trial 30 Hari
         $daysSinceJoined = $tenant->created_at->diffInDays(now());
         return $daysSinceJoined <= 30;
     }
 
-    /**
-     * SATPAM 2: Mengunci data agar tidak muncul jika diakses lewat URL
-     */
     public static function getEloquentQuery(): Builder
     {
         $query = parent::getEloquentQuery();
-
         /** @var \App\Models\User $user */
         $user = Auth::user();
         $tenant = Filament::getTenant();
@@ -62,7 +54,6 @@ class PurchaseResource extends Resource
         if ($user && $user->is_admin) return $query;
         if (!$tenant) return $query->whereRaw('1 = 0');
 
-        // Logika Gembok Otomatis
         $daysSinceJoined = $tenant->created_at->diffInDays(now());
         $isSubscriptionActive = $tenant->is_active && ($tenant->subscription_until === null || now()->lte($tenant->subscription_until));
         $isTrialActive = !$tenant->is_active && $daysSinceJoined <= 30;
@@ -94,27 +85,63 @@ class PurchaseResource extends Resource
                     Forms\Components\Repeater::make('items')
                         ->relationship()
                         ->schema([
+                            // 1. Pilih Produk
                             Forms\Components\Select::make('product_id')
                                 ->label('Produk')
                                 ->relationship(
                                     'product',
                                     'name',
-                                    modifyQueryUsing: fn($query) =>
-                                    $query->where('store_id', Filament::getTenant()->id)
+                                    modifyQueryUsing: fn($query) => $query->where('store_id', Filament::getTenant()->id)
                                 )
                                 ->required()
                                 ->searchable()
-                                ->preload(),
+                                ->preload()
+                                ->live() // Penting agar dropdown satuan di bawahnya berubah
+                                ->afterStateUpdated(fn($set) => $set('unit_id', null)),
 
+                            // 2. Pilih Satuan (Kg/Gr sesuai konversi produk)
+                            Forms\Components\Select::make('unit_id')
+                                ->label('Satuan Beli')
+                                ->placeholder('Pilih Satuan')
+                                ->options(function (Forms\Get $get) {
+                                    $productId = $get('product_id');
+                                    if (!$productId) return [];
+
+                                    $product = Product::with(['unit', 'unitConversions.fromUnit'])->find($productId);
+                                    if (!$product) return [];
+
+                                    // Satuan Dasar
+                                    $options = [];
+                                    if ($product->unit) {
+                                        $options[$product->unit_id] = $product->unit->name . ' (Dasar)';
+                                    }
+
+                                    // Satuan Konversi (Kg, Karung, dll)
+                                    foreach ($product->unitConversions as $conversion) {
+                                        if ($conversion->fromUnit) {
+                                            $options[$conversion->from_unit_id] = $conversion->fromUnit->name;
+                                        }
+                                    }
+
+                                    return $options;
+                                })
+                                ->required()
+                                ->live(),
+
+                            // 3. Jumlah Beli
                             Forms\Components\TextInput::make('qty')
                                 ->label('Jumlah')
                                 ->numeric()
+                                ->default(1)
                                 ->required()
                                 ->live(onBlur: true)
                                 ->afterStateUpdated(function ($set, $get) {
-                                    $set('subtotal', ((int) $get('qty')) * ((int) $get('price')));
+                                    $qty = (float) ($get('qty') ?? 0);
+                                    $price = (float) ($get('price') ?? 0);
+                                    $set('subtotal', $qty * $price);
                                 }),
 
+                            // 4. Harga Satuan
                             Forms\Components\TextInput::make('price')
                                 ->label('Harga Satuan')
                                 ->numeric()
@@ -122,17 +149,22 @@ class PurchaseResource extends Resource
                                 ->prefix('Rp')
                                 ->live(onBlur: true)
                                 ->afterStateUpdated(function ($set, $get) {
-                                    $set('subtotal', ((int) $get('qty')) * ((int) $get('price')));
+                                    $qty = (float) ($get('qty') ?? 0);
+                                    $price = (float) ($get('price') ?? 0);
+                                    $set('subtotal', $qty * $price);
                                 }),
 
+                            // 5. Subtotal (Otomatis)
                             Forms\Components\TextInput::make('subtotal')
+                                ->label('Subtotal')
                                 ->numeric()
                                 ->disabled()
                                 ->dehydrated()
                                 ->prefix('Rp'),
                         ])
-                        ->columns(4)
+                        ->columns(5)
                         ->defaultItems(1)
+                        ->addActionLabel('Tambah Item Belanja')
                         ->columnSpanFull(),
                 ])
         ]);
@@ -178,6 +210,7 @@ class PurchaseResource extends Resource
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
+                Tables\Actions\DeleteAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
