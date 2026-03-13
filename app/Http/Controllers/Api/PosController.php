@@ -329,11 +329,8 @@ class PosController extends Controller
     public function getKitchenOrders($slug)
     {
         $store = Store::where('slug', $slug)->firstOrFail();
-
         $orders = Order::where('store_id', $store->id)
-            // Ambil hari ini
-            ->where('status', 'pending') // Sudah bayar
-            // Belum selesai masak
+            ->where('status', 'pending')
             ->with('items.product')
             ->orderBy('created_at', 'asc')
             ->get();
@@ -341,12 +338,8 @@ class PosController extends Controller
         return response()->json(['status' => 'success', 'data' => $orders]);
     }
 
-    // 11. Update Status Dapur
-    // 11. Update Status Dapur & Kurangi Stok
-    // 11. Update Status Dapur & Potong Stok Produk Langsung
     public function markItemReady($id)
     {
-        // 1. Cari Item dengan relasi resep, bahan baku, dan satuan agar tidak query berulang kali (Eager Loading)
         $orderItem = OrderItem::with([
             'product.recipes.ingredient.unit',
             'order'
@@ -359,7 +352,7 @@ class PosController extends Controller
             ], 404);
         }
 
-        // 2. Cek apakah item sudah selesai sebelumnya? (Mencegah double potong stok)
+
         if ($orderItem->status === 'done') {
             return response()->json([
                 'success' => true,
@@ -369,19 +362,13 @@ class PosController extends Controller
 
         try {
             DB::transaction(function () use ($orderItem) {
-
-                // A. LOGIKA POTONG STOK
                 if ($orderItem->product) {
                     $product = $orderItem->product;
-
-                    // Jika produk menggunakan RESEP (Contoh: Nasi Goreng)
                     if ($product->is_recipe) {
                         foreach ($product->recipes as $recipe) {
                             $ingredient = $recipe->ingredient;
 
                             if ($ingredient) {
-                                // 1. Hitung Multiplier Konversi
-                                // Jika satuan di resep berbeda dengan satuan dasar di gudang
                                 $multiplier = 1;
                                 if ($recipe->unit_id != $ingredient->unit_id) {
                                     $conversion = \App\Models\UnitConversion::where('product_id', $ingredient->id)
@@ -391,18 +378,14 @@ class PosController extends Controller
                                     $multiplier = $conversion ? $conversion->multiplier : 1;
                                 }
 
-                                // 2. Hitung Total yang dipotong: (Qty Resep * Multiplier) * Qty Pesanan
-                                // Contoh: (0.5 Kg * 1000) * 2 Porsi = 1000 Gram
                                 $totalDeduct = ($recipe->quantity * $multiplier) * $orderItem->quantity;
-
-                                // 3. Potong stok bahan baku di tabel products
                                 $ingredient->decrement('stock', $totalDeduct);
                                 StockMutation::create([
                                     'product_id' => $ingredient->id,
                                     'store_id' => $ingredient->store_id,
                                     'type' => 'out',
                                     'quantity' => $totalDeduct,
-                                    'reference_stock' => $ingredient->stock + $totalDeduct, // Stok sebelum dikurangi
+                                    'reference_stock' => $ingredient->stock + $totalDeduct,
                                     'reference_type' => 'order_item',
                                     'reference_id' => $orderItem->id,
                                     'description' => "Pemakaian bahan untuk {$orderItem->product->name} (Qty: {$orderItem->quantity})",
@@ -410,23 +393,20 @@ class PosController extends Controller
                             }
                         }
                     } else {
-                        // Jika produk JUALAN LANGSUNG (Contoh: Air Mineral Botol)
                         if ($product->track_stock) {
                             $product->decrement('stock', $orderItem->quantity);
                         }
                     }
                 }
 
-                // B. Update Status Item jadi 'done'
+
                 $orderItem->update(['status' => 'done']);
 
-                // C. Cek Otomatis Status Order Induk (Kitchen Logic)
+
                 $parentOrder = $orderItem->order;
                 if ($parentOrder) {
-                    // Hitung item yang masih 'pending' di order ini
-                    $pendingItems = $parentOrder->items()->where('status', '!=', 'done')->count();
 
-                    // Jika semua item sudah 'done', maka pesanan siap saji (ready)
+                    $pendingItems = $parentOrder->items()->where('status', '!=', 'done')->count();
                     if ($pendingItems === 0) {
                         $parentOrder->update(['status' => 'ready']);
                     }
@@ -513,5 +493,31 @@ class PosController extends Controller
         });
 
         return response()->json(['message' => 'Status update & Stok bahan baku berkurang!']);
+    }
+
+    public function getStoreInit($slug)
+    {
+        // 1. Cari tokonya berdasarkan slug
+        $store = Store::where('slug', $slug)->first();
+
+        if (!$store) {
+            return response()->json(['message' => 'Toko tidak ditemukan'], 404);
+        }
+
+        // 2. Ambil karyawan yang terdaftar di toko ini
+        // Di sini saya pakai model User yang store_id nya cocok
+        $employees = User::where('store_id', $store->id)
+            ->select('id', 'name', 'role')
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'store' => [
+                'id' => $store->id,
+                'name' => $store->name,
+                'logo' => $store->logo,
+            ],
+            'employees' => $employees
+        ]);
     }
 }

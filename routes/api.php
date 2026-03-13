@@ -34,6 +34,7 @@ Route::get('/pos/{slug}/employees', [App\Http\Controllers\Api\PosController::cla
 Route::post('/pos/verify-pin', [PosController::class, 'verifyPin']);
 // Route Logout (Harus punya Token)
 Route::middleware('auth:sanctum')->post('/logout', [AuthController::class, 'logout']);
+Route::get('/pos/{slug}/init', [PosController::class, 'getStoreInit']);
 
 // routes/api.php
 Route::middleware('auth:sanctum')->get('/my-stores', function (Request $request) {
